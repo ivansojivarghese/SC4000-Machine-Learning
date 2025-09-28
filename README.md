@@ -86,3 +86,8 @@ Outputs `./sub/student_submission.csv` with probability columns:
 - Use a stronger model (e.g., `bert-base-uncased`, `deberta-v3-base`).
 - Add soft-label distillation with teacher logits (KL + CE).
 - Keep calibration on a separate split; report holdout metrics.
+
+## Notes
+- Early stopping monitors eval_loss and restores the best checkpoint due to load_best_model_at_end=True.
+- Label smoothing helps probability calibration and can reduce overconfidence; 0.05–0.1 is a good starting range.
+- On CPU, training is slow; consider lowering max_samples for quick experiments or running fewer epochs. On GPU, you can increase batch size or epochs.
