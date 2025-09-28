@@ -8,12 +8,12 @@ What you can do locally:
 - Run mock train/inference to validate structure and output a submission (`./sub/final_submission.csv`).
 - Train a real student model (DistilBERT or BERT), calibrate probabilities with temperature scaling, evaluate on a dedicated holdout, and produce a calibrated submission (`./sub/student_submission.csv`).
 
-## Data layout
+## Data layout (not included)
 - Train CSV (one of):
   - `./data/train.csv`
   - `./data/lmsys-chatbot-arena/train.csv`
   - Columns required: `prompt,response_a,response_b` and either `winner` or probability columns: `winner_model_a(_prob), winner_model_b(_prob), winner_tie(_prob)`.
-- Test CSV: `./data/test.csv` (already present).
+- Test CSV: `./data/test.csv`.
 
 ## Quick start (Windows PowerShell)
 1) Install dependencies
@@ -88,3 +88,8 @@ Outputs `./sub/student_submission.csv` with probability columns:
 - Use a stronger model (e.g., `bert-base-uncased`, `deberta-v3-base`).
 - Add soft-label distillation with teacher logits (KL + CE).
 - Keep calibration on a separate split; report holdout metrics.
+
+## Notes
+- Early stopping monitors eval_loss and restores the best checkpoint due to load_best_model_at_end=True.
+- Label smoothing helps probability calibration and can reduce overconfidence; 0.05–0.1 is a good starting range.
+- On CPU, training is slow; consider lowering max_samples for quick experiments or running fewer epochs. On GPU, you can increase batch size or epochs.
