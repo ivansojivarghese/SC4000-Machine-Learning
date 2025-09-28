@@ -16,6 +16,7 @@ import torch
 from torch.nn import functional as F
 from datasets import Dataset
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from sklearn.metrics import log_loss
 
 LABEL_MAP = {"model_a": 0, "model_b": 1, "tie": 2, "tie (both bad)": 2}
 
@@ -126,13 +127,25 @@ def calibrate_student(
     # Fit temperature on calibration split only
     T = fit_temperature(cal_logits, cal_labels)
 
-    # Metrics on calibration split
+    # Metrics on calibration split (NLL and Kaggle log loss)
     cal_before = compute_nll(cal_logits, cal_labels, T=1.0)
     cal_after = compute_nll(cal_logits, cal_labels, T=T)
+    cal_probs_before = np.exp(cal_logits - cal_logits.max(axis=1, keepdims=True))
+    cal_probs_before = cal_probs_before / cal_probs_before.sum(axis=1, keepdims=True)
+    cal_probs_after = np.exp(cal_logits / T - (cal_logits / T).max(axis=1, keepdims=True))
+    cal_probs_after = cal_probs_after / cal_probs_after.sum(axis=1, keepdims=True)
+    cal_ll_before = float(log_loss(cal_labels, cal_probs_before, labels=[0, 1, 2]))
+    cal_ll_after = float(log_loss(cal_labels, cal_probs_after, labels=[0, 1, 2]))
 
     # Metrics on holdout split (reporting set)
     hold_before = compute_nll(hold_logits, hold_labels, T=1.0)
     hold_after = compute_nll(hold_logits, hold_labels, T=T)
+    hold_probs_before = np.exp(hold_logits - hold_logits.max(axis=1, keepdims=True))
+    hold_probs_before = hold_probs_before / hold_probs_before.sum(axis=1, keepdims=True)
+    hold_probs_after = np.exp(hold_logits / T - (hold_logits / T).max(axis=1, keepdims=True))
+    hold_probs_after = hold_probs_after / hold_probs_after.sum(axis=1, keepdims=True)
+    hold_ll_before = float(log_loss(hold_labels, hold_probs_before, labels=[0, 1, 2]))
+    hold_ll_after = float(log_loss(hold_labels, hold_probs_after, labels=[0, 1, 2]))
 
     payload = {
         'temperature': float(T),
@@ -144,6 +157,12 @@ def calibrate_student(
         'nll_holdout_before': float(hold_before),
         'nll_holdout_after': float(hold_after),
         'nll_holdout_improvement': float(hold_before - hold_after),
+        'logloss_cal_before': float(cal_ll_before),
+        'logloss_cal_after': float(cal_ll_after),
+        'logloss_cal_improvement': float(cal_ll_before - cal_ll_after),
+        'logloss_holdout_before': float(hold_ll_before),
+        'logloss_holdout_after': float(hold_ll_after),
+        'logloss_holdout_improvement': float(hold_ll_before - hold_ll_after),
     }
 
     with open(output_json, 'w') as f:

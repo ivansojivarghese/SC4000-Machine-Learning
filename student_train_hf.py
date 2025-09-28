@@ -20,6 +20,8 @@ from transformers import (
 )
 from transformers import EarlyStoppingCallback
 import numpy as np
+from scipy.special import softmax
+from sklearn.metrics import log_loss
 
 LABEL_MAP = {"model_a": 0, "model_b": 1, "tie": 2, "tie (both bad)": 2}
 
@@ -107,7 +109,7 @@ def train_student(
         save_strategy='epoch',
         save_total_limit=1,
         load_best_model_at_end=True,
-        metric_for_best_model='eval_loss',
+        metric_for_best_model='log_loss',
         greater_is_better=False,
         logging_steps=20,
         label_smoothing_factor=label_smoothing,
@@ -116,9 +118,12 @@ def train_student(
 
     def compute_metrics(eval_pred):
         logits, labels = eval_pred
-        preds = np.argmax(logits, axis=-1)
+        probs = softmax(logits, axis=1)
+        # Kaggle-style multiclass log loss
+        ll = float(log_loss(labels, probs, labels=[0, 1, 2]))
+        preds = probs.argmax(axis=1)
         acc = float((preds == labels).mean())
-        return {'accuracy': acc}
+        return {'log_loss': ll, 'accuracy': acc, 'eval_loss': ll}
 
     trainer = Trainer(
         model=model,

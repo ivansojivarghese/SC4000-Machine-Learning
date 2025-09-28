@@ -141,7 +141,13 @@ def main():
         if not train_csv:
             raise FileNotFoundError('train.csv not found in ./data or ./data/lmsys-chatbot-arena')
         info = calibrate_student(model_dir='./model_save/student_distilbert', train_csv=train_csv)
-        logger.info(f"Holdout NLL (before/after): {info.get('nll_holdout_before'):.6f} -> {info.get('nll_holdout_after'):.6f} (Δ {info.get('nll_holdout_improvement'):.6f})")
+        logger.info(
+            f"Holdout NLL (before/after): {info.get('nll_holdout_before'):.6f} -> {info.get('nll_holdout_after'):.6f} (Δ {info.get('nll_holdout_improvement'):.6f})"
+        )
+        if 'logloss_holdout_before' in info:
+            logger.info(
+                f"Holdout LogLoss (before/after): {info.get('logloss_holdout_before'):.6f} -> {info.get('logloss_holdout_after'):.6f} (Δ {info.get('logloss_holdout_improvement'):.6f})"
+            )
 
 
 if __name__ == '__main__':

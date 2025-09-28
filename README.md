@@ -48,7 +48,7 @@ python main.py --mode student-train \
 Trainer details:
 - Label smoothing: configurable via `--student-label-smoothing` (default 0.05)
 - Early stopping: `--student-early-stopping` patience (default 2), monitors eval_loss
-- Best-checkpoint restore: `load_best_model_at_end=True` using `eval_loss`
+- Best-checkpoint restore: `load_best_model_at_end=True` using Kaggle-style `log_loss`
 - Checkpoints: `save_strategy='epoch'`, `save_total_limit=1`
 
 Artifacts:
@@ -66,6 +66,8 @@ The console logs and `calibration.json` include:
 - temperature
 - nll_cal_before / nll_cal_after / nll_cal_improvement
 - nll_holdout_before / nll_holdout_after / nll_holdout_improvement
+- logloss_cal_before / logloss_cal_after / logloss_cal_improvement (Kaggle-style)
+- logloss_holdout_before / logloss_holdout_after / logloss_holdout_improvement (Kaggle-style)
 
 Notes:
 - In this small baseline, calibration may slightly help or hurt on holdout; expect better gains as the student improves (more epochs, stronger backbone, soft-label distillation).
@@ -81,7 +83,7 @@ Outputs `./sub/student_submission.csv` with probability columns:
 - `winner_tie`
 
 ## Tips for better Log Loss
-- Train longer (5–8 epochs) with early stopping.
+- Train longer (5–8 epochs) with early stopping; we select best by Kaggle log loss.
 - Increase `--student-max-samples` or use the full dataset.
 - Use a stronger model (e.g., `bert-base-uncased`, `deberta-v3-base`).
 - Add soft-label distillation with teacher logits (KL + CE).
