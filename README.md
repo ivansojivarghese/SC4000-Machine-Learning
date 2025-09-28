@@ -8,12 +8,12 @@ What you can do locally:
 - Run mock train/inference to validate structure and output a submission (`./sub/final_submission.csv`).
 - Train a real student model (DistilBERT or BERT), calibrate probabilities with temperature scaling, evaluate on a dedicated holdout, and produce a calibrated submission (`./sub/student_submission.csv`).
 
-## Data layout
+## Data layout (not included)
 - Train CSV (one of):
   - `./data/train.csv`
   - `./data/lmsys-chatbot-arena/train.csv`
   - Columns required: `prompt,response_a,response_b` and either `winner` or probability columns: `winner_model_a(_prob), winner_model_b(_prob), winner_tie(_prob)`.
-- Test CSV: `./data/test.csv` (already present).
+- Test CSV: `./data/test.csv`.
 
 ## Quick start (Windows PowerShell)
 1) Install dependencies
