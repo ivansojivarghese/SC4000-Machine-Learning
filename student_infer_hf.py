@@ -9,9 +9,13 @@ Run inference with the trained small student classifier (DistilBERT) on test.csv
 import os
 import numpy as np
 import pandas as pd
-from typing import Dict
+from typing import Dict, Optional, List
 
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from transformers import AutoTokenizer, AutoModelForSequenceClassification, BitsAndBytesConfig
+try:
+    from auto_gptq import AutoGPTQForCausalLM
+except Exception:
+    AutoGPTQForCausalLM = None
 import torch
 from torch.nn import functional as F
 
@@ -32,6 +36,8 @@ def infer_student(
     submission_path: str = './sub/student_submission.csv',
     batch_size: int = 16,
     max_length: int = 512,
+    tta_lengths: Optional[List[int]] = None,
+    load_in_8bit: bool = False,
 ):
     if not os.path.exists(model_dir):
         raise FileNotFoundError(f"Model directory not found: {model_dir}")
@@ -47,7 +53,31 @@ def infer_student(
     texts = (df.apply(build_input_text, axis=1)).tolist()
 
     tokenizer = AutoTokenizer.from_pretrained(model_dir)
-    model = AutoModelForSequenceClassification.from_pretrained(model_dir)
+    # Try GPTQ-quantized model first if files exist (AutoGPTQ CausalLM). If not applicable, fall back to seq-classifier.
+    quant_cfg = None
+    if load_in_8bit:
+        quant_cfg = BitsAndBytesConfig(load_in_8bit=True)
+    model = None
+    if AutoGPTQForCausalLM is not None and os.path.exists(os.path.join(model_dir, 'gptq_model-4bit-128g.safetensors')):
+        # GPTQ path (Causal LM); wrap minimal classification head logic if needed — here we assume fine-tuned seq-classifier path by default.
+        # If GPTQ dir actually contains a sequence classification head, AutoModelForSequenceClassification will still be correct.
+        try:
+            model = AutoModelForSequenceClassification.from_pretrained(
+                model_dir,
+                device_map='auto' if torch.cuda.is_available() else None,
+            )
+        except Exception:
+            # Fallback: load as CausalLM; user would need a matching inference head. Kept as best-effort.
+            try:
+                _ = AutoGPTQForCausalLM.from_quantized(model_dir, device_map='auto')
+            except Exception:
+                pass
+    if model is None:
+        model = AutoModelForSequenceClassification.from_pretrained(
+            model_dir,
+            quantization_config=quant_cfg,
+            device_map='auto' if torch.cuda.is_available() else None,
+        )
     model.eval()
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -64,19 +94,24 @@ def infer_student(
         except Exception:
             temperature = 1.0
 
-    probs_list = []
+    lengths = tta_lengths if tta_lengths else [max_length]
+    probs_accum = None
     with torch.no_grad():
-        for i in range(0, len(texts), batch_size):
-            batch_texts = texts[i:i+batch_size]
-            enc = tokenizer(batch_texts, truncation=True, padding='max_length', max_length=max_length, return_tensors='pt')
-            enc = {k: v.to(device) for k, v in enc.items()}
-            logits = model(**enc).logits  # [B,3]
-            if temperature != 1.0:
-                logits = logits / temperature
-            probs = F.softmax(logits, dim=-1).cpu().numpy()
-            probs_list.append(probs)
+        for L in lengths:
+            probs_list = []
+            for i in range(0, len(texts), batch_size):
+                batch_texts = texts[i:i+batch_size]
+                enc = tokenizer(batch_texts, truncation=True, padding='max_length', max_length=L, return_tensors='pt')
+                enc = {k: v.to(device) for k, v in enc.items()}
+                logits = model(**enc).logits  # [B,3]
+                if temperature != 1.0:
+                    logits = logits / temperature
+                probs = F.softmax(logits, dim=-1).cpu().numpy()
+                probs_list.append(probs)
+            probs = np.vstack(probs_list)
+            probs_accum = probs if probs_accum is None else (probs_accum + probs)
 
-    probs = np.vstack(probs_list)
+    probs = probs_accum / len(lengths)
     # safety normalization
     probs = np.clip(probs, 1e-9, None)
     probs = probs / probs.sum(axis=1, keepdims=True)

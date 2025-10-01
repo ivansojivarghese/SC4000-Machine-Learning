@@ -102,7 +102,7 @@ def calibrate_student(
     cal_ds = split2['train']
     holdout_ds = split2['test']
 
-    tokenizer = AutoTokenizer.from_pretrained(model_dir)
+    tokenizer = AutoTokenizer.from_pretrained(model_dir, use_fast=False)
     model = AutoModelForSequenceClassification.from_pretrained(model_dir)
     model.eval()
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
