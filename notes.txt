@@ -1,0 +1,16 @@
+Suggested pipeline flow:
+
+Step 1: Post-pretrain large models on UT dataset
+Step 2: Split Kaggle + 33k data into 5 folds
+Step 3: Train LLaMA3 70B & Qwen2 72B on folds
+Step 4: Infer logits for all training data
+Step 5: Distill logits into Gemma2-9B model
+Step 6: Ensemble LoRA layers from 5 folds
+Step 7: Quantize final model to 8-bit (GPTQ)
+Step 8: Apply TTA during inference
+Step 9: Evaluate CV and LB
+
+
+HF token:
+
+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

@@ -13,6 +13,7 @@ def train_lora(
     base_model: str,
     output_dir: str,
     data_path: str,
+    tokenizer_path: Optional[str] = None,
     num_epochs: int = 1,
     lr: float = 1e-5,
     max_length: int = 1024,
@@ -23,8 +24,26 @@ def train_lora(
     bf16: bool = False,
 ):
     os.makedirs(output_dir, exist_ok=True)
+    # Ensure standard HTTP path; disable xet/transfer accelerations in-process just in case
+    os.environ.setdefault("TRANSFORMERS_OFFLINE", "0")
+    os.environ.setdefault("HF_HUB_ENABLE_HF_TRANSFER", "0")
+    os.environ.setdefault("HUGGINGFACE_HUB_ENABLE_HF_TRANSFER", "0")
+    os.environ.setdefault("HF_HUB_ENABLE_HF_XET", "0")
+    os.environ.setdefault("HUGGINGFACE_HUB_ENABLE_HF_XET", "0")
+    os.environ.setdefault("HF_HUB_DISABLE_XET", "1")
 
-    tokenizer = AutoTokenizer.from_pretrained(base_model, use_fast=True)
+    tok_src = tokenizer_path or base_model
+    try:
+        tokenizer = AutoTokenizer.from_pretrained(tok_src, use_fast=True, local_files_only=False, trust_remote_code=True)
+    except Exception as e_fast:
+        # Fallback: try slow tokenizer
+        try:
+            tokenizer = AutoTokenizer.from_pretrained(tok_src, use_fast=False, local_files_only=False, trust_remote_code=True)
+        except Exception as e_slow:
+            raise RuntimeError(
+                f"Failed to load tokenizer from '{tok_src}'. If your base model dir lacks tokenizer files, "
+                f"pass --tokenizer-path pointing to a compatible model/repo with tokenizer files (e.g., meta-llama/Meta-Llama-3-70B)."
+            ) from e_slow
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
@@ -37,11 +56,16 @@ def train_lora(
             bnb_4bit_compute_dtype=torch.bfloat16 if bf16 else torch.float16,
         )
 
+    # Allow passing a HF token via env if needed; step1 passes token at login level already
+    hf_token = os.environ.get("HF_TOKEN") or os.environ.get("HUGGINGFACE_TOKEN")
     model = AutoModelForCausalLM.from_pretrained(
         base_model,
         device_map="auto",
         quantization_config=bnb_config,
-        torch_dtype=torch.bfloat16 if bf16 else torch.float16,
+        dtype=torch.bfloat16 if bf16 else torch.float16,
+        token=hf_token,
+        trust_remote_code=True,
+        local_files_only=False,
     )
 
     if qlora:
@@ -51,7 +75,7 @@ def train_lora(
         r=r,
         lora_alpha=lora_alpha,
         lora_dropout=lora_dropout,
-        target_modules=["q_proj", "k_proj", "v_proj", "o_proj"],
+        target_modules="all-linear",
         bias="none",
         task_type="CAUSAL_LM",
     )
@@ -76,7 +100,7 @@ def train_lora(
     args = TrainingArguments(
         output_dir=output_dir,
         per_device_train_batch_size=1,
-        gradient_accumulation_steps=16,
+        gradient_accumulation_steps=64,
         num_train_epochs=num_epochs,
         learning_rate=lr,
         fp16=not bf16,
@@ -99,6 +123,7 @@ if __name__ == "__main__":
     p.add_argument("--base-model", required=True)
     p.add_argument("--output-dir", required=True)
     p.add_argument("--data-path", required=True)
+    p.add_argument("--tokenizer-path", default=None)
     p.add_argument("--epochs", type=int, default=1)
     p.add_argument("--lr", type=float, default=1e-5)
     p.add_argument("--max-length", type=int, default=1024)
@@ -113,6 +138,7 @@ if __name__ == "__main__":
         base_model=a.base_model,
         output_dir=a.output_dir,
         data_path=a.data_path,
+        tokenizer_path=a.tokenizer_path,
         num_epochs=a.epochs,
         lr=a.lr,
         max_length=a.max_length,

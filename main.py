@@ -196,7 +196,7 @@ def main():
         train_csv = next((p for p in train_csv_candidates if os.path.exists(p)), None)
         if not train_csv:
             raise FileNotFoundError('train.csv not found in ./data or ./data/lmsys-chatbot-arena')
-    info = calibrate_student(model_dir=args.student_output_model_dir, train_csv=train_csv)
+        info = calibrate_student(model_dir=args.student_output_model_dir, train_csv=train_csv)
         logger.info(f'Calibration saved. Info: {info}')
 
     if args.mode == 'student-eval-holdout':

@@ -16,3 +16,5 @@ peft>=0.11.0
 # bitsandbytes provides 4-bit/8-bit quantization for QLoRA; Linux-only wheels
 bitsandbytes>=0.42.0
 auto-gptq>=0.7.1
+pyarrow>=11.0.0
+# Intentionally not using hf_transfer; standard huggingface_hub snapshot_download is used
