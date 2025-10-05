@@ -9,16 +9,11 @@ What you can do locally:
 - Train a real student model (DistilBERT or BERT), calibrate probabilities with temperature scaling, evaluate on a dedicated holdout, and produce a calibrated submission (`./sub/student_submission.csv`).
 
 ## Data layout
-Available in this repo (inside ./data):
-- test.csv
-- sample_submission.csv
-
-Not available in this repo (due to size):
-- train.csv [https://www.kaggle.com/competitions/lmsys-chatbot-arena/data?select=train.csv]
-- ultrafeedback.csv [https://www.kaggle.com/datasets/thedrcat/llm-human-preference-data-ultrafeedback/data?select=ultrafeedback.csv]
-- ultrafeedback_ties.csv [https://www.kaggle.com/datasets/thedrcat/llm-human-preference-data-ultrafeedback/data?select=ultrafeedback_ties.csv]
-- lmsys-33k.csv [https://www.kaggle.com/datasets/abdullahmeda/lmsys-additional-33k-labelled-conversations?select=lmsys-33k.csv]
-- lmsys-33k-deduplicated.csv [https://www.kaggle.com/datasets/abdullahmeda/lmsys-additional-33k-labelled-conversations?select=lmsys-33k-deduplicated.csv]
+- Train CSV (one of):
+  - `./data/train.csv`
+  - `./data/lmsys-chatbot-arena/train.csv`
+  - Columns required: `prompt,response_a,response_b` and either `winner` or probability columns: `winner_model_a(_prob), winner_model_b(_prob), winner_tie(_prob)`.
+- Test CSV: `./data/test.csv` (already present).
 
 ## Quick start (Windows PowerShell)
 1) Install dependencies
