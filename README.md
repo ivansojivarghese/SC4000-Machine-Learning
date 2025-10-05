@@ -8,6 +8,11 @@ What you can do locally:
 - Run mock train/inference to validate structure and output a submission (`./sub/final_submission.csv`).
 - Train a real student model (DistilBERT or BERT), calibrate probabilities with temperature scaling, evaluate on a dedicated holdout, and produce a calibrated submission (`./sub/student_submission.csv`).
 
+## Modes
+- google/gemma-2-9b [https://huggingface.co/google/gemma-2-9b]
+- Qwen/Qwen2.5-72B [https://huggingface.co/Qwen/Qwen2.5-72B]
+- meta-llama/Llama-3.1-70B [https://huggingface.co/meta-llama/Llama-3.1-70B]
+
 ## Data layout
 - Train CSV (one of):
   - `./data/train.csv`
