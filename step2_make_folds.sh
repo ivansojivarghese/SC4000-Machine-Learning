@@ -22,6 +22,13 @@ conda activate myenv
 
 cd ~/exported-assets_sc4000
 
+SCRATCH_BASE=${SCRATCH_BASE:-/scratch-shared/tc1proj005}
+FOLDS_LOCAL_DIR="data/processed_data"
+FOLDS_LOCAL_FILE="${FOLDS_LOCAL_DIR}/folds_5_seed42.json"
+FOLDS_SCRATCH_DIR=${FOLDS_OUT_DIR:-"${SCRATCH_BASE}/folds"}
+mkdir -p "${FOLDS_LOCAL_DIR}" || true
+mkdir -p "${FOLDS_SCRATCH_DIR}" || true
+
 python - <<'PY'
 import json, os, pandas as pd
 import numpy as np
@@ -51,9 +58,22 @@ for k, (_, val_idx) in enumerate(skf.split(df, labels)):
     folds[k] = sorted(val_idx.tolist())
 
 os.makedirs('data/processed_data', exist_ok=True)
-with open('data/processed_data/folds_5_seed42.json','w') as f:
-    json.dump(folds, f)
-print('[Step2] wrote data/processed_data/folds_5_seed42.json')
+out_local = os.environ.get('FOLDS_LOCAL_FILE','data/processed_data/folds_5_seed42.json')
+with open(out_local,'w') as f:
+        json.dump(folds, f)
+print(f'[Step2] wrote {out_local}')
 PY
+
+SCRATCH_FOLDS_FILE="${FOLDS_SCRATCH_DIR}/folds_5_seed42.json"
+if [ -f "${FOLDS_LOCAL_FILE}" ]; then
+    cp -f "${FOLDS_LOCAL_FILE}" "${SCRATCH_FOLDS_FILE}" && echo "[Step2] Copied folds JSON to ${SCRATCH_FOLDS_FILE}" || echo "[Step2][Warn] Failed to copy folds JSON to scratch (${SCRATCH_FOLDS_FILE})"
+else
+    echo "[Step2][Warn] Expected local folds file ${FOLDS_LOCAL_FILE} not found after generation." >&2
+fi
+if [ -f "${SCRATCH_FOLDS_FILE}" ]; then
+    echo "[Step2] Scratch folds file present: ${SCRATCH_FOLDS_FILE}";
+else
+    echo "[Step2][Error] Scratch folds file missing: ${SCRATCH_FOLDS_FILE}" >&2
+fi
 
 echo "[Step2] Done"

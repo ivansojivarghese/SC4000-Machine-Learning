@@ -37,23 +37,43 @@ export HF_DATASETS_CACHE="${PWD}/.hf_cache"
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 python - <<'PY'
-import os, json, math, torch, numpy as np, pandas as pd
+import os, json, math, torch, numpy as np, pandas as pd, glob, sys
 from transformers import AutoTokenizer, AutoModelForCausalLM
 
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
-FOLDS = range(5)
+FOLDS_SPEC = os.environ.get('INFER_FOLDS','all')
+if FOLDS_SPEC == 'all':
+  FOLDS = list(range(5))
+else:
+  parts=[p for p in FOLDS_SPEC.replace(',', ' ').split() if p.strip().isdigit()]
+  FOLDS=[int(p) for p in parts]
+SCRATCH_BASE=os.environ.get('SCRATCH_BASE','/scratch-shared/tc1proj005')
+SAVE_ROOT=os.environ.get('TEACHER_SAVE_ROOT', os.path.join(SCRATCH_BASE,'folds'))
+DISABLE_SYMLINKS = os.environ.get('TEACHER_DISABLE_SYMLINKS','0') == '1'
+print(f"[Step4] Using SAVE_ROOT={SAVE_ROOT}; DISABLE_SYMLINKS={DISABLE_SYMLINKS}; FOLDS={FOLDS}")
 
 # Detect base model dir patterns used in step3 outputs
 def pick_model_dir(prefix_base: str, fold: int):
-  # new naming
-  cand = f'model_save/{prefix_base}_fold_{fold}'
-  if os.path.isdir(cand):
-    return cand
-  # fallback old naming (llama3-70b, qwen2-72b)
+  # Primary: scratch SAVE_ROOT
+  scratch_cand = os.path.join(SAVE_ROOT, f'{prefix_base}_fold_{fold}')
+  if os.path.isdir(scratch_cand):
+    return scratch_cand
+  if not DISABLE_SYMLINKS:
+    cand = f'model_save/{prefix_base}_fold_{fold}'
+    if os.path.isdir(cand):
+      return cand
   legacy = f'model_save/{prefix_base}3-70b_fold_{fold}'
   if os.path.isdir(legacy):
     return legacy
   return None
+
+def has_weight_files(dir_path: str) -> bool:
+  if dir_path is None: return False
+  single = [os.path.join(dir_path, f) for f in ['model.safetensors','pytorch_model.bin']]
+  if any(os.path.isfile(p) for p in single):
+    return True
+  shards = glob.glob(os.path.join(dir_path,'model-*.safetensors'))
+  return len(shards) > 0
 
 def load_rows(csv_path):
   return pd.read_csv(csv_path)
@@ -135,59 +155,40 @@ for fold in FOLDS:
   llama_dir = pick_model_dir('llama', fold)
   qwen_dir  = pick_model_dir('qwen', fold)
   for name, mdir in [('llama', llama_dir), ('qwen', qwen_dir)]:
-    if mdir is None:
-      print(f'[Step4][Warn] Missing model dir for {name} fold {fold}; skipping')
-      continue
-    print(f'[Step4] Loading {name} fold {fold} from {mdir}')
-    tok = AutoTokenizer.from_pretrained(mdir, use_fast=True, trust_remote_code=True)
-    if tok.pad_token is None:
-      tok.pad_token = tok.eos_token
-    model = AutoModelForCausalLM.from_pretrained(mdir, device_map='auto', torch_dtype=torch.float16, trust_remote_code=True)
-    model.to(DEVICE)
-  records_train=train_df.to_dict('records')
-  texts_train=[extract_text(r) for r in records_train]
-  logits_train=batched_logits(model, tok, texts_train, max_len=min(getattr(tok,'model_max_length',1024),1024))
-  out_train_path=f'model_save/teacher_logits/{name}_fold_{fold}_train_lasttok_logits.pt'
-  torch.save(logits_train, out_train_path)
-  print(f'[Step4] Saved train last-token logits {logits_train.shape} -> {out_train_path}')
-  # Pairwise response log-likelihoods
-  if {'response_a','response_b'} <= set(train_df.columns):
-    prompts=[build_prompt(r) for r in records_train]
-    # Convert stringified list prompt variant if needed
-    # If prompt column looks like a JSON array string, keep as-is for now; downstream cleaning could be applied.
-    logp_a, logp_b = compute_pair_loglik(model, tok, prompts, [str(r.get('response_a','')) for r in records_train], [str(r.get('response_b','')) for r in records_train], max_len=1024)
-    # Simple tie modeling: treat tie score as average of both or apply temperature smoothing
-    # Here tie raw log score = 0.5*(logp_a + logp_b)
-    logp_t = 0.5*(logp_a + logp_b)
-    raw = torch.stack([logp_a, logp_b, logp_t], dim=1)
-    # Stabilize and softmax
-    probs = torch.softmax(raw, dim=1)
-    torch.save(raw, f'model_save/teacher_logits/{name}_fold_{fold}_train_logprobs.pt')
-    torch.save(probs, f'model_save/teacher_logits/{name}_fold_{fold}_train_probs.pt')
-    print(f'[Step4] Saved train logprobs {raw.shape} and probs -> *_train_[logprobs|probs].pt')
-  else:
-    print(f'[Step4][Warn] response_a/response_b columns not found; skipping probability distribution computation.')
-    if val_df is not None:
-      val_records=val_df.to_dict('records')
-      texts_val=[extract_text(r) for r in val_records]
-      logits_val=batched_logits(model, tok, texts_val, max_len=min(getattr(tok,'model_max_length',1024),1024))
-      out_val_path=f'model_save/teacher_logits/{name}_fold_{fold}_val_lasttok_logits.pt'
-      torch.save(logits_val, out_val_path)
-      print(f'[Step4] Saved val last-token logits {logits_val.shape} -> {out_val_path}')
-      if {'response_a','response_b'} <= set(val_df.columns):
-        prompts=[build_prompt(r) for r in val_records]
-        logp_a, logp_b = compute_pair_loglik(model, tok, prompts, [str(r.get('response_a','')) for r in val_records], [str(r.get('response_b','')) for r in val_records], max_len=1024)
-        logp_t = 0.5*(logp_a + logp_b)
-        raw = torch.stack([logp_a, logp_b, logp_t], dim=1)
-        probs = torch.softmax(raw, dim=1)
-        torch.save(raw, f'model_save/teacher_logits/{name}_fold_{fold}_val_logprobs.pt')
-        torch.save(probs, f'model_save/teacher_logits/{name}_fold_{fold}_val_probs.pt')
-        print(f'[Step4] Saved val logprobs and probs -> *_val_[logprobs|probs].pt')
+      if mdir is None:
+          print(f'[Step4][Warn] Missing model dir for {name} fold {fold}; skipping')
+          continue
+      if not has_weight_files(mdir):
+          print(f'[Step4][Error] No weight files detected in {mdir}; expected model.safetensors/pytorch_model.bin or shards model-*.safetensors')
+          continue
+      print(f'[Step4] Loading {name} fold {fold} from {mdir}')
+      tok = AutoTokenizer.from_pretrained(mdir, use_fast=True, trust_remote_code=True)
+      if tok.pad_token is None:
+          tok.pad_token = tok.eos_token
+      model = AutoModelForCausalLM.from_pretrained(mdir, device_map='auto', torch_dtype=torch.float16, trust_remote_code=True)
+      model.to(DEVICE)
+      records_train=train_df.to_dict('records')
+      texts_train=[extract_text(r) for r in records_train]
+      logits_train=batched_logits(model, tok, texts_train, max_len=min(getattr(tok,'model_max_length',1024),1024))
+      os.makedirs('model_save/teacher_logits', exist_ok=True)
+      out_train_path=f'model_save/teacher_logits/{name}_fold_{fold}_train_lasttok_logits.pt'
+      torch.save(logits_train, out_train_path)
+      print(f'[Step4] Saved train last-token logits {logits_train.shape} -> {out_train_path}')
+      if {'response_a','response_b'} <= set(train_df.columns):
+          prompts=[build_prompt(r) for r in records_train]
+          logp_a, logp_b = compute_pair_loglik(model, tok, prompts, [str(r.get('response_a','')) for r in records_train], [str(r.get('response_b','')) for r in records_train], max_len=1024)
+          logp_t = 0.5*(logp_a + logp_b)
+          raw = torch.stack([logp_a, logp_b, logp_t], dim=1)
+          probs = torch.softmax(raw, dim=1)
+          torch.save(raw, f'model_save/teacher_logits/{name}_fold_{fold}_train_logprobs.pt')
+          torch.save(probs, f'model_save/teacher_logits/{name}_fold_{fold}_train_probs.pt')
+          print(f'[Step4] Saved train logprobs {raw.shape} and probs -> *_train_[logprobs|probs].pt')
       else:
-        print(f'[Step4][Warn] val missing response_a/response_b; skipping val probs.')
-    # Free
-    del model, tok
-    torch.cuda.empty_cache() if torch.cuda.is_available() else None
+          print(f'[Step4][Warn] response_a/response_b columns not found; skipping probability distribution computation for train.')
+      # Optionally process val set similarly if needed later.
+      del model, tok
+      if torch.cuda.is_available():
+          torch.cuda.empty_cache()
 print('[Step4] Completed logits extraction.')
 PY
 

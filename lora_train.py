@@ -3,7 +3,7 @@ import json
 from typing import Optional
 
 import torch
-from transformers import AutoTokenizer, AutoModelForCausalLM, TrainingArguments, Trainer
+from transformers import AutoTokenizer, AutoModelForCausalLM, TrainingArguments, Trainer, TrainerCallback
 from datasets import load_dataset
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 from transformers import BitsAndBytesConfig
@@ -186,10 +186,66 @@ def train_lora(
         report_to="none",
     )
 
-    trainer = Trainer(model=model, args=args, train_dataset=tokenized)
+    # Timing callback to capture per-step durations
+    class StepTimingCallback(TrainerCallback):
+        def __init__(self):
+            self.step_times = []
+            self._last = None
+            self._train_start = None
+        def on_train_begin(self, args, state, control, **kwargs):
+            import time
+            self._train_start = time.time()
+            self._last = self._train_start
+        def on_step_end(self, args, state, control, **kwargs):
+            import time
+            now = time.time()
+            if self._last is not None:
+                self.step_times.append(now - self._last)
+            self._last = now
+        def summary(self):
+            import math, time
+            if not self.step_times:
+                return {}
+            return {
+                "steps_recorded": len(self.step_times),
+                "avg_step_sec": sum(self.step_times)/len(self.step_times),
+                "p50_step_sec": sorted(self.step_times)[len(self.step_times)//2],
+                "p90_step_sec": sorted(self.step_times)[int(len(self.step_times)*0.9)-1 if len(self.step_times)>1 else 0],
+            }
+
+    timing_cb = StepTimingCallback()
+    trainer = Trainer(model=model, args=args, train_dataset=tokenized, callbacks=[timing_cb])
+    import time, json
+    t0 = time.time()
     trainer.train()
+    total_time = time.time() - t0
+    # Save artifacts
     model.save_pretrained(output_dir)
     tokenizer.save_pretrained(output_dir)
+    # Export logs & summary
+    try:
+        log_hist = trainer.state.log_history
+        with open(os.path.join(output_dir,'training_log.json'),'w') as f:
+            json.dump(log_hist, f, indent=2)
+    except Exception as e:
+        print(f"[WARN] Could not write training_log.json: {e}")
+    # Parameter stats captured earlier
+    summary = {
+        "total_time_sec": total_time,
+        "global_steps": getattr(trainer.state,'global_step', None),
+        "max_steps_arg": max_steps,
+        "effective_max_steps": args.max_steps,
+        "trainable_params": trainable if 'trainable' in locals() else None,
+        "total_params": total if 'total' in locals() else None,
+        "trainable_pct": pct if 'pct' in locals() else None,
+        "timing": timing_cb.summary(),
+    }
+    try:
+        with open(os.path.join(output_dir,'training_summary.json'),'w') as f:
+            json.dump(summary, f, indent=2)
+        print('[INFO] Wrote training_summary.json')
+    except Exception as e:
+        print(f"[WARN] Could not write training_summary.json: {e}")
 
 
 if __name__ == "__main__":
