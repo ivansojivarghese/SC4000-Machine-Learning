@@ -145,6 +145,12 @@ sbatch step3_train_teachers.sh
 export HF_TOKEN=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
 sbatch --export=ALL,TEACHER_FOLDS=3,TEACHER_MAX_STEPS=30,LLAMA_FT_BASE=/scratch-shared/tc1proj005/post_pretrain_llama3-8b_merged,QWEN_FT_BASE=/scratch-shared/tc1proj005/post_pretrain_qwen2-72b_merged step3_train_teachers.sh
 OR
+TEACHER_FOLDS=3 \
+LLAMA_FT_BASE=/scratch-shared/tc1proj005/post_pretrain_llama3-8b_merged \
+QWEN_FT_BASE=/scratch-shared/tc1proj005/post_pretrain_qwen2-72b_merged \
+TEACHER_DISABLE_SYMLINKS=1 TEACHER_REQUIRE_WEIGHTS=1 \
+TEACHER_SKIP_TRAIN=0 \
+sbatch step3_train_teachers.sh
 
 
 export HF_TOKEN=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

@@ -1,0 +1,46 @@
+[Step3] Resolving SCRATCH_BASE...
+[Step3] Using SCRATCH_BASE=/scratch-shared/tc1proj005
+[Step3] Hugging Face login succeeded (token provided).
+[Step3] Using Kaggle train: data/train.csv | External: data/ultrafeedback.csv
+[Step3][Prep] Starting fold CSV generation...
+[Step3][Prep] Loaded folds json with keys: ['0', '1', '2', '3', '4']
+[Step3][Prep] Filtering to folds ['2'] per TEACHER_FOLDS=2
+[Step3][Prep] Reading Kaggle train CSV...
+[Step3][Prep] Loaded Kaggle train df: (57477, 9)
+[Step3][Prep] Reading external CSV...
+[Step3][Prep] Loaded external df: (157675, 8)
+[Step3][Prep] Writing fold CSVs initially to /scratch-shared/tc1proj005/fold_data (will mirror to data/fold_data)
+[Step3][Prep][Fold 2] Start generation (val idx count=11495)
+[Step3][Prep][Fold 2] Built val set shape=(11495, 9)
+[Step3][Prep][Fold 2] Train subset shape=(45982, 9)
+[Step3][Prep][Fold 2] Combined shape=(203657, 17) (will write)
+[Step3][Prep][Fold 2] Composition: kaggle_train_rows=45982 external_rows=157675 expected_total=203657
+[Step3][Prep] Completed fold CSV generation in 21.6s
+[Step3][Sync] Copied data/fold_data/fold_0_train.csv -> /scratch-shared/tc1proj005/fold_data/
+[Step3][Sync] Copied data/fold_data/fold_0_val.csv -> /scratch-shared/tc1proj005/fold_data/
+[Step3][Sync] Copied data/fold_data/fold_1_train.csv -> /scratch-shared/tc1proj005/fold_data/
+[Step3][Sync] Copied data/fold_data/fold_1_val.csv -> /scratch-shared/tc1proj005/fold_data/
+[Step3][Sync] Copied data/fold_data/fold_2_train.csv -> /scratch-shared/tc1proj005/fold_data/
+[Step3][Sync] Copied data/fold_data/fold_2_val.csv -> /scratch-shared/tc1proj005/fold_data/
+[Step3][Sync] Copied data/fold_data/fold_3_train.csv -> /scratch-shared/tc1proj005/fold_data/
+[Step3][Sync] Copied data/fold_data/fold_3_val.csv -> /scratch-shared/tc1proj005/fold_data/
+[Step3][Sync] Copied data/fold_data/fold_4_train.csv -> /scratch-shared/tc1proj005/fold_data/
+[Step3][Sync] Copied data/fold_data/fold_4_val.csv -> /scratch-shared/tc1proj005/fold_data/
+[Step3] LLaMA base: /scratch-shared/tc1proj005/post_pretrain_llama3-8b_merged | tokenizer: meta-llama/Meta-Llama-3.1-8B | skip=0
+[Step3] Qwen base:  /scratch-shared/tc1proj005/post_pretrain_qwen2-72b_merged | tokenizer: Qwen/Qwen2.5-14B | skip=0
+[Step3] Teacher artifacts will be saved under: /scratch-shared/tc1proj005/folds
+[Step3] Selected folds: 2 (from TEACHER_FOLDS='2')
+[Step3] Root-level symlinks for fold models will be created (TEACHER_EXPOSE_ROOT=1).
+[Step3] Symlink creation disabled (TEACHER_DISABLE_SYMLINKS=1) — artifacts will exist only under SAVE_ROOT=/scratch-shared/tc1proj005/folds.
+[Step3] Will enforce presence of model.safetensors or pytorch_model.bin (TEACHER_REQUIRE_WEIGHTS=1).
+[Step3] LLaMA fold 2 train csv: data/fold_data/fold_2_train.csv
+[DEBUG] Trainable params: 41,943,040 / 4,582,543,360 (0.9153%)
+[WARN] load_dataset csv auto-infer failed: DatasetGenerationError: An error occurred while generating the dataset
+[WARN] Falling back to pandas coercion mode.
+[INFO] Fallback dataset constructed: 203657 rows | columns: ['id', 'model_a', 'model_b', 'prompt', 'response_a', 'response_b', 'winner_model_a', 'winner_model_b', 'winner_tie', 'source', 'chosen', 'chosen-rating', 'chosen-model', 'rejected', 'rejected-rating']...
+{'loss': 1.244, 'grad_norm': 0.3165340721607208, 'learning_rate': 6.041666666666667e-06, 'epoch': 0.0}
+{'loss': 1.2417, 'grad_norm': 0.3699328601360321, 'learning_rate': 1.8750000000000003e-06, 'epoch': 0.0}
+{'train_runtime': 1452.0715, 'train_samples_per_second': 0.264, 'train_steps_per_second': 0.033, 'train_loss': 1.2376594344774883, 'epoch': 0.0}
+[INFO] Wrote training_summary.json
+[Merge] Saving merged model to /scratch-shared/tc1proj005/folds/llama_fold_2
+[Step3][Error] LLaMA merge fold 2 failed
