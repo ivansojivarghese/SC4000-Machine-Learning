@@ -166,6 +166,10 @@ sbatch step3_train_teachers.sh
 
 
 Step 4:
+INFER_SAVE_LASTTOK=0 INFER_FORCE_REGEN=1 sbatch step4_infer_teacher_logits.sh
+OR
+INFER_PREFER_LORA=1 INFER_LLAMA_SUBSET=15000-20000 INFER_QWEN_SUBSET=9000-10000 INFER_SUBSET_SEED=42 sbatch step4_infer_teacher_logits.sh
+
 
 Step 5:
 

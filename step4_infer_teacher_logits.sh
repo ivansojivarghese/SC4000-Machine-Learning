@@ -16,7 +16,7 @@
 #SBATCH --gres=gpu:1
 #SBATCH --mem=64G
 #SBATCH --nodes=1
-#SBATCH --time=720
+#SBATCH --time=360   # 6 hours
 #SBATCH --cpus-per-task=8
 #SBATCH --job-name=S4_TeacherInfer
 #SBATCH --output=output_%x_%j.out
@@ -37,159 +37,382 @@ export HF_DATASETS_CACHE="${PWD}/.hf_cache"
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 python - <<'PY'
-import os, json, math, torch, numpy as np, pandas as pd, glob, sys
+import os, json, torch, pandas as pd, glob
+from peft import PeftModel
 from transformers import AutoTokenizer, AutoModelForCausalLM
 
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 FOLDS_SPEC = os.environ.get('INFER_FOLDS','all')
-if FOLDS_SPEC == 'all':
-  FOLDS = list(range(5))
-else:
-  parts=[p for p in FOLDS_SPEC.replace(',', ' ').split() if p.strip().isdigit()]
-  FOLDS=[int(p) for p in parts]
-SCRATCH_BASE=os.environ.get('SCRATCH_BASE','/scratch-shared/tc1proj005')
-SAVE_ROOT=os.environ.get('TEACHER_SAVE_ROOT', os.path.join(SCRATCH_BASE,'folds'))
-DISABLE_SYMLINKS = os.environ.get('TEACHER_DISABLE_SYMLINKS','0') == '1'
-print(f"[Step4] Using SAVE_ROOT={SAVE_ROOT}; DISABLE_SYMLINKS={DISABLE_SYMLINKS}; FOLDS={FOLDS}")
+FOLDS = list(range(5)) if FOLDS_SPEC=='all' else [int(p) for p in FOLDS_SPEC.replace(',',' ').split() if p.isdigit()]
+SCRATCH_BASE = os.environ.get('SCRATCH_BASE','/scratch-shared/tc1proj005')
+SAVE_ROOT = os.environ.get('TEACHER_SAVE_ROOT', os.path.join(SCRATCH_BASE,'folds'))
+DISABLE_SYMLINKS = os.environ.get('TEACHER_DISABLE_SYMLINKS','0')=='1'
+INFER_MODELS = [m for m in os.environ.get('INFER_MODELS','llama,qwen').replace(',',' ').split() if m]
+ENSEMBLE_OUT = os.environ.get('INFER_ENSEMBLE_OUT','model_save/teacher_logits/ensemble_oof_probs.pt')
+OOF_TABLE = os.environ.get('INFER_OOF_TABLE','model_save/teacher_logits/oof_probs.parquet')
+FORCE_REGEN = os.environ.get('INFER_FORCE_REGEN','0')=='1'
+CALC_VAL = os.environ.get('INFER_INCLUDE_VAL','1')=='1'
+SAVE_LASTTOK = os.environ.get('INFER_SAVE_LASTTOK','0')=='1'
+LASTTOK_TOPK = int(os.environ.get('INFER_LASTTOK_TOPK','0'))  # 0 means full when saving
+print(f"[Step4] SAVE_ROOT={SAVE_ROOT} FOLDS={FOLDS} MODELS={INFER_MODELS} SAVE_LASTTOK={SAVE_LASTTOK} TOPK={LASTTOK_TOPK}")
 
-# Detect base model dir patterns used in step3 outputs
-def pick_model_dir(prefix_base: str, fold: int):
-  # Primary: scratch SAVE_ROOT
-  scratch_cand = os.path.join(SAVE_ROOT, f'{prefix_base}_fold_{fold}')
-  if os.path.isdir(scratch_cand):
-    return scratch_cand
-  if not DISABLE_SYMLINKS:
-    cand = f'model_save/{prefix_base}_fold_{fold}'
+def pick_model_dir(prefix: str, fold: int):
+    cand = os.path.join(SAVE_ROOT, f'{prefix}_fold_{fold}')
     if os.path.isdir(cand):
-      return cand
-  legacy = f'model_save/{prefix_base}3-70b_fold_{fold}'
-  if os.path.isdir(legacy):
-    return legacy
-  return None
+        return cand
+    if not DISABLE_SYMLINKS:
+        alt = f'model_save/{prefix}_fold_{fold}'
+        if os.path.isdir(alt):
+            return alt
+    return None
 
-def has_weight_files(dir_path: str) -> bool:
-  if dir_path is None: return False
-  single = [os.path.join(dir_path, f) for f in ['model.safetensors','pytorch_model.bin']]
-  if any(os.path.isfile(p) for p in single):
-    return True
-  shards = glob.glob(os.path.join(dir_path,'model-*.safetensors'))
-  return len(shards) > 0
+def pick_lora_dir(prefix: str, fold: int):
+    # canonical SAVE_ROOT location
+    lora = os.path.join(SAVE_ROOT, f'{prefix}_fold_{fold}_lora')
+    if os.path.isdir(lora):
+        return lora
+    if not DISABLE_SYMLINKS:
+        alt = f'model_save/{prefix}_fold_{fold}_lora'
+        if os.path.isdir(alt):
+            return alt
+    return None
 
-def load_rows(csv_path):
-  return pd.read_csv(csv_path)
+def has_weight_files(d: str) -> bool:
+    if not d: return False
+    for f in ('model.safetensors','pytorch_model.bin'):
+        if os.path.isfile(os.path.join(d,f)):
+            return True
+    if glob.glob(os.path.join(d,'model-*.safetensors')):
+        return True
+    return False
+
+STRICT_NONEMPTY = os.environ.get('INFER_STRICT_NONEMPTY','0')=='1'
+def load_rows(path: str):
+    try:
+        size = os.path.getsize(path)
+        if size == 0:
+            msg = f"[Step4][Warn] Empty CSV {path} (0 bytes)."
+            if STRICT_NONEMPTY:
+                raise RuntimeError(msg)
+            print(msg + " Skipping.")
+            return pd.DataFrame()
+        # Force all columns to string to avoid mixed-type parser issues
+        df = pd.read_csv(path, dtype=str, low_memory=False)
+        print(f"[Step4] Loaded {path} rows={len(df)} cols={len(df.columns)}")
+        return df
+    except pd.errors.EmptyDataError:
+        msg = f"[Step4][Warn] EmptyDataError reading {path}"
+        if STRICT_NONEMPTY:
+            raise
+        print(msg + " -> returning empty DataFrame")
+        return pd.DataFrame()
+    except Exception as e:
+        if STRICT_NONEMPTY:
+            raise
+        print(f"[Step4][Warn] Failed to read {path}: {e} -> empty DataFrame")
+        return pd.DataFrame()
 
 def build_prompt(row):
-  prompt = row.get('prompt')
-  if prompt is None:
-    # original dataset stores prompt as JSON-like list string; handle fallback columns
-    prompt = row.get('question') or ''
-  return str(prompt).strip()
+    return str(row.get('prompt') or row.get('question') or '').strip()
 
 def extract_text(row):
-  # For last-token embedding snapshot; join prompt + chosen single response if unified column exists
-  prompt = build_prompt(row)
-  resp = row.get('response') or row.get('chosen') or row.get('answer') or ''
-  return (prompt + '\n' if prompt else '') + str(resp).strip()
+    p = build_prompt(row)
+    r = row.get('response') or row.get('chosen') or row.get('answer') or ''
+    return (p+'\n' if p else '') + str(r).strip()
 
-def compute_pair_loglik(model, tokenizer, prompts, resp_a_list, resp_b_list, max_len=1024, batch_size=1):
-  """Return log likelihood (sum log probs) for response_a and response_b for each prompt.
-  Uses causal LM token probabilities: log P(resp | prompt).
-  """
-  logp_a, logp_b = [], []
-  model.eval()
-  with torch.no_grad():
-    for i in range(0, len(prompts), batch_size):
-      batch_prompts = prompts[i:i+batch_size]
-      a_batch = resp_a_list[i:i+batch_size]
-      b_batch = resp_b_list[i:i+batch_size]
-      # Encode separately to avoid cross-attention contamination and differing lengths.
-      for p, ra, rb in zip(batch_prompts, a_batch, b_batch):
-        # Tokenize (prompt + response) once per response
-        for resp, store in [(ra, logp_a), (rb, logp_b)]:
-            full = (p + '\n' if p else '') + resp
-            enc = tokenizer(full, return_tensors='pt', truncation=True, max_length=max_len)
-            input_ids = enc['input_ids'].to(DEVICE)
-            attn = enc['attention_mask'].to(DEVICE)
-            # Identify boundary: prompt length tokens (need prompt tokenization alone)
-            p_enc = tokenizer(p + ('\n' if p else ''), return_tensors='pt', truncation=True, max_length=max_len)
-            p_len = p_enc['input_ids'].shape[-1]
-            out = model(input_ids=input_ids, attention_mask=attn, use_cache=False)
-            logits = out.logits[:, :-1, :]  # shift for next-token prediction
-            target = input_ids[:, 1:]
-            # Only response portion contributes to conditional loglikelihood
-            resp_slice = slice(p_len-1, target.shape[1])  # p_len includes last prompt token; adjust index
-            logits_resp = logits[:, resp_slice, :]
-            target_resp = target[:, resp_slice]
-            lls = torch.nn.functional.log_softmax(logits_resp, dim=-1)
-            tok_ll = lls.gather(-1, target_resp.unsqueeze(-1)).squeeze(-1)
-            store.append(tok_ll.sum().item())
-  return torch.tensor(logp_a), torch.tensor(logp_b)
+def compute_pair_loglik(model, tokenizer, prompts, ra_list, rb_list, max_len=1024):
+    logp_a, logp_b = [], []
+    model.eval()
+    with torch.no_grad():
+        for p, ra, rb in zip(prompts, ra_list, rb_list):
+            for resp, store in [(ra, logp_a), (rb, logp_b)]:
+                full = (p+'\n' if p else '') + resp
+                enc = tokenizer(full, return_tensors='pt', truncation=True, max_length=max_len)
+                input_ids = enc['input_ids'].to(DEVICE)
+                attn = enc['attention_mask'].to(DEVICE)
+                p_enc = tokenizer(p + ('\n' if p else ''), return_tensors='pt', truncation=True, max_length=max_len)
+                p_len = p_enc['input_ids'].shape[-1]
+                out = model(input_ids=input_ids, attention_mask=attn, use_cache=False)
+                logits = out.logits[:, :-1, :]
+                target = input_ids[:, 1:]
+                resp_slice = slice(p_len-1, target.shape[1])
+                lls = torch.nn.functional.log_softmax(logits[:, resp_slice, :], dim=-1)
+                tgt = target[:, resp_slice]
+                tok_ll = lls.gather(-1, tgt.unsqueeze(-1)).squeeze(-1)
+                store.append(tok_ll.sum().item())
+    return torch.tensor(logp_a), torch.tensor(logp_b)
 
-def batched_logits(model, tokenizer, texts, max_len=512, batch_size=2):
-  all_logits = []
-  model.eval()
-  with torch.no_grad():
-    for i in range(0, len(texts), batch_size):
-      batch = texts[i:i+batch_size]
-      enc = tokenizer(batch, return_tensors='pt', truncation=True, max_length=max_len, padding=True)
-      enc = {k: v.to(DEVICE) for k,v in enc.items()}
-      out = model(**enc, use_cache=False)
-      # Take last token logits as a simple representation (or average)
-      logits = out.logits[:, -1, :]  # [B, vocab]
-      # For classification placeholder, store top-k? Here we just store raw slice of logits mean/std for debug.
-      all_logits.append(logits.cpu().float())
-  return torch.cat(all_logits, dim=0)
+def batched_lasttok_repr(model, tokenizer, texts, max_len=512, batch_size=2):
+    if not SAVE_LASTTOK:
+        return None
+    chunks = []
+    model.eval()
+    with torch.no_grad():
+        for i in range(0, len(texts), batch_size):
+            batch = texts[i:i+batch_size]
+            enc = tokenizer(batch, return_tensors='pt', truncation=True, max_length=max_len, padding=True)
+            enc = {k: v.to(DEVICE) for k,v in enc.items()}
+            out = model(**enc, use_cache=False)
+            logits = out.logits[:, -1, :].to(torch.float16)
+            if LASTTOK_TOPK > 0:
+                k = min(LASTTOK_TOPK, logits.size(-1))
+                vals, idx = torch.topk(logits, k=k, dim=-1)
+                chunks.append({'topk_values': vals.cpu(), 'topk_indices': idx.cpu()})
+            else:
+                chunks.append(logits.cpu())
+    if LASTTOK_TOPK > 0:
+        return {
+            'k': LASTTOK_TOPK,
+            'topk_values': torch.cat([c['topk_values'] for c in chunks], 0),
+            'topk_indices': torch.cat([c['topk_indices'] for c in chunks], 0),
+            'dtype': 'float16'
+        }
+    return torch.cat(chunks, 0)
 
 os.makedirs('model_save/teacher_logits', exist_ok=True)
 
-for fold in FOLDS:
-  # Paths from step3 prep
-  train_csv=f'data/fold_data/fold_{fold}_train.csv'
-  val_csv=f'data/fold_data/fold_{fold}_val.csv'
-  if not os.path.isfile(train_csv):
-    print(f'[Step4][Skip] Missing {train_csv}; run step3 prep first.')
-    continue
-  train_df=load_rows(train_csv)
-  val_df=load_rows(val_csv) if os.path.isfile(val_csv) else None
+def save_obj(path, obj):
+    if (not FORCE_REGEN) and os.path.isfile(path):
+        print(f"[Step4][Skip] {path} exists")
+        return
+    torch.save(obj, path)
+    if isinstance(obj, dict):
+        shape = obj['topk_values'].shape
+        print(f"[Step4] Saved top-k lasttok -> {path} shape={shape}")
+    else:
+        print(f"[Step4] Saved tensor -> {path} shape={tuple(obj.shape)}")
 
-  llama_dir = pick_model_dir('llama', fold)
-  qwen_dir  = pick_model_dir('qwen', fold)
-  for name, mdir in [('llama', llama_dir), ('qwen', qwen_dir)]:
-      if mdir is None:
-          print(f'[Step4][Warn] Missing model dir for {name} fold {fold}; skipping')
-          continue
-      if not has_weight_files(mdir):
-          print(f'[Step4][Error] No weight files detected in {mdir}; expected model.safetensors/pytorch_model.bin or shards model-*.safetensors')
-          continue
-      print(f'[Step4] Loading {name} fold {fold} from {mdir}')
-      tok = AutoTokenizer.from_pretrained(mdir, use_fast=True, trust_remote_code=True)
-      if tok.pad_token is None:
-          tok.pad_token = tok.eos_token
-      model = AutoModelForCausalLM.from_pretrained(mdir, device_map='auto', torch_dtype=torch.float16, trust_remote_code=True)
-      model.to(DEVICE)
-      records_train=train_df.to_dict('records')
-      texts_train=[extract_text(r) for r in records_train]
-      logits_train=batched_logits(model, tok, texts_train, max_len=min(getattr(tok,'model_max_length',1024),1024))
-      os.makedirs('model_save/teacher_logits', exist_ok=True)
-      out_train_path=f'model_save/teacher_logits/{name}_fold_{fold}_train_lasttok_logits.pt'
-      torch.save(logits_train, out_train_path)
-      print(f'[Step4] Saved train last-token logits {logits_train.shape} -> {out_train_path}')
-      if {'response_a','response_b'} <= set(train_df.columns):
-          prompts=[build_prompt(r) for r in records_train]
-          logp_a, logp_b = compute_pair_loglik(model, tok, prompts, [str(r.get('response_a','')) for r in records_train], [str(r.get('response_b','')) for r in records_train], max_len=1024)
-          logp_t = 0.5*(logp_a + logp_b)
-          raw = torch.stack([logp_a, logp_b, logp_t], dim=1)
-          probs = torch.softmax(raw, dim=1)
-          torch.save(raw, f'model_save/teacher_logits/{name}_fold_{fold}_train_logprobs.pt')
-          torch.save(probs, f'model_save/teacher_logits/{name}_fold_{fold}_train_probs.pt')
-          print(f'[Step4] Saved train logprobs {raw.shape} and probs -> *_train_[logprobs|probs].pt')
-      else:
-          print(f'[Step4][Warn] response_a/response_b columns not found; skipping probability distribution computation for train.')
-      # Optionally process val set similarly if needed later.
-      del model, tok
-      if torch.cuda.is_available():
-          torch.cuda.empty_cache()
-print('[Step4] Completed logits extraction.')
+oof_rows = []
+
+for fold in FOLDS:
+    train_csv = f'data/fold_data/fold_{fold}_train.csv'
+    val_csv = f'data/fold_data/fold_{fold}_val.csv'
+    if not os.path.isfile(train_csv):
+        print(f"[Step4][Skip] Missing {train_csv}")
+        continue
+    train_df = load_rows(train_csv)
+    if train_df.empty:
+        print(f"[Step4][Skip] train_df empty for fold {fold}; continuing to next fold.")
+        continue
+    # Subset controls (global + per-model). We first record original indices for optional mapping.
+    train_df['_orig_idx'] = list(range(len(train_df)))
+    subset_size_global = int(os.environ.get('INFER_TRAIN_SUBSET_SIZE','0') or '0')
+    subset_seed = int(os.environ.get('INFER_SUBSET_SEED','123') or '123')
+    strict_subset = os.environ.get('INFER_STRICT_SUBSET','0')=='1'
+    # Per-model overrides allow dramatically smaller subsets: INFER_LLAMA_SUBSET, INFER_QWEN_SUBSET
+    # Format: either single integer (e.g., 18000) or range "15000-20000" -> sample uniform random size in that range per fold.
+    def parse_subset(spec: str):
+        if not spec:
+            return None
+        spec = spec.strip()
+        if '-' in spec:
+            a,b = spec.split('-',1)
+            try:
+                lo, hi = int(a), int(b)
+                if lo>hi: lo,hi = hi,lo
+                import random
+                sz = random.Random(subset_seed + fold).randint(lo, hi)
+                return sz
+            except ValueError:
+                return None
+        else:
+            try:
+                return int(spec)
+            except ValueError:
+                return None
+    llama_spec = os.environ.get('INFER_LLAMA_SUBSET','')
+    qwen_spec  = os.environ.get('INFER_QWEN_SUBSET','')
+    # We will defer actual sampling until inside per-model loop if per-model subset specified; if only global subset, apply once here.
+    if subset_size_global > 0 and not (llama_spec or qwen_spec):
+        current_n = len(train_df)
+        if subset_size_global > current_n:
+            msg = f"[Step4][Subset] Requested global subset_size={subset_size_global} exceeds train rows={current_n} (fold {fold})."
+            if strict_subset:
+                raise RuntimeError(msg + " (INFER_STRICT_SUBSET=1)")
+            else:
+                print(msg + " Using full train set instead.")
+        elif subset_size_global < current_n:
+            train_df = train_df.sample(n=subset_size_global, random_state=subset_seed).reset_index(drop=True)
+            print(f"[Step4][Subset] Fold {fold}: global sampled {subset_size_global}/{current_n} rows (seed={subset_seed}).")
+        else:
+            print(f"[Step4][Subset] Fold {fold}: global subset equals train rows ({current_n}).")
+    val_df = load_rows(val_csv) if os.path.isfile(val_csv) else None
+
+    model_dirs = {}
+    if 'llama' in INFER_MODELS:
+        model_dirs['llama'] = pick_model_dir('llama', fold)
+    if 'qwen' in INFER_MODELS:
+        model_dirs['qwen'] = pick_model_dir('qwen', fold)
+
+    prefer_lora = os.environ.get('INFER_PREFER_LORA','0')=='1'
+    base_llama = os.environ.get('BASE_LLAMA_DIR') or os.environ.get('LLAMA_BASE_DIR') or os.path.join(SCRATCH_BASE,'post_pretrain_llama3-8b_merged')
+    base_qwen  = os.environ.get('BASE_QWEN_DIR')  or os.environ.get('QWEN_BASE_DIR')  or os.path.join(SCRATCH_BASE,'post_pretrain_qwen2-72b_merged')
+    base_map = {'llama': base_llama, 'qwen': base_qwen}
+
+    for name, mdir in model_dirs.items():
+        lora_dir = pick_lora_dir(name, fold)
+        using_lora = False
+        load_dir = mdir
+        # Decide whether to use merged or lora
+        if prefer_lora or ( (mdir is None or not has_weight_files(mdir)) and lora_dir is not None ):
+            using_lora = True
+            load_dir = lora_dir
+        if using_lora:
+            if lora_dir is None:
+                print(f"[Step4][Warn] No LoRA dir found for {name} fold {fold}")
+                continue
+            base_dir = base_map.get(name)
+            if not base_dir or not os.path.isdir(base_dir):
+                print(f"[Step4][Error] Base model dir {base_dir} missing for {name} needed to apply LoRA {lora_dir}")
+                continue
+        else:
+            if load_dir is None or not has_weight_files(load_dir):
+                print(f"[Step4][Warn] Missing merged weights for {name} fold {fold} (dir={load_dir}); consider INFER_PREFER_LORA=1 if LoRA exists.")
+                continue
+
+        source_desc = f"LoRA {lora_dir} + base {base_map.get(name)}" if using_lora else load_dir
+        print(f"[Step4] Loading {name} fold {fold} from {source_desc}")
+        # Robust tokenizer loading with fallback if tokenizer assets were pruned from fold dir.
+        def load_tokenizer_with_fallback(model_name:str, model_dir:str):
+            # Environment overrides
+            env_specific = os.environ.get(f'{model_name.upper()}_TOKENIZER_PATH')
+            generic_fallback = os.environ.get('FALLBACK_TOKENIZER_PATH')
+            base_dir_env = os.environ.get(f'{model_name.upper()}_BASE_DIR')
+            tried = []
+            candidates = [model_dir]
+            # Auto sibling *_lora detection if tokenizer assets absent
+            def has_tokenizer_files(path):
+                if not path or not os.path.isdir(path):
+                    return False
+                for fn in ('tokenizer.model','tokenizer.json','tokenizer_config.json'):
+                    if os.path.isfile(os.path.join(path, fn)):
+                        return True
+                return False
+            if not has_tokenizer_files(model_dir):
+                sib = model_dir + '_lora'
+                if has_tokenizer_files(sib) and sib not in candidates:
+                    candidates.append(sib)
+            # Also consider direct lora_dir if using lora inference
+            if using_lora and lora_dir not in candidates:
+                candidates.append(lora_dir)
+            if env_specific and env_specific not in candidates:
+                candidates.append(env_specific)
+            if base_dir_env and base_dir_env not in candidates:
+                candidates.append(base_dir_env)
+            if generic_fallback and generic_fallback not in candidates:
+                candidates.append(generic_fallback)
+            last_err=None
+            for c in candidates:
+                try:
+                    tried.append(c)
+                    tok_local = AutoTokenizer.from_pretrained(c, use_fast=True, trust_remote_code=True)
+                    return tok_local, c
+                except Exception as e:
+                    last_err=e
+                    continue
+            # Retry slow tokenizer if fast failed everywhere
+            for c in candidates:
+                try:
+                    tried.append(c+'(slow)')
+                    tok_local = AutoTokenizer.from_pretrained(c, use_fast=False, trust_remote_code=True)
+                    return tok_local, c
+                except Exception as e:
+                    last_err=e
+            raise RuntimeError(f"Tokenizer load failed for {model_name}. Tried: {tried}. Last error: {last_err}")
+
+        tok, tok_src = load_tokenizer_with_fallback(name, load_dir if not using_lora else lora_dir)
+        if tok.pad_token is None:
+            tok.pad_token = tok.eos_token
+        print(f"[Step4][Info] Tokenizer source for {name} fold {fold}: {tok_src}")
+        if using_lora:
+            # load base, then apply LoRA adapter
+            base_dir_for_load = base_map.get(name)
+            try:
+                base_model = AutoModelForCausalLM.from_pretrained(base_dir_for_load, device_map='auto', torch_dtype=torch.float16, trust_remote_code=True)
+            except Exception as e:
+                print(f"[Step4][Error] Failed loading base model {base_dir_for_load} for {name} fold {fold}: {e}")
+                continue
+            try:
+                model = PeftModel.from_pretrained(base_model, lora_dir, torch_dtype=torch.float16)
+            except Exception as e:
+                print(f"[Step4][Error] Failed applying LoRA {lora_dir} to base {base_dir_for_load}: {e}")
+                continue
+        else:
+            model = AutoModelForCausalLM.from_pretrained(mdir, device_map='auto', torch_dtype=torch.float16, trust_remote_code=True)
+        model.to(DEVICE)
+
+        # Apply per-model subset if specified (works off pre-global-sampled or global-sampled frame)
+        model_subset_spec = llama_spec if name=='llama' else qwen_spec if name=='qwen' else ''
+        model_subset_size = parse_subset(model_subset_spec) if model_subset_spec else None
+        model_train_df = train_df
+        if model_subset_size and model_subset_size > 0:
+            cur_n = len(model_train_df)
+            if model_subset_size > cur_n:
+                msg = f"[Step4][Subset] {name} fold {fold}: requested {model_subset_size} > available {cur_n}."
+                if strict_subset:
+                    print(msg + " Aborting per strict mode.")
+                    continue
+                else:
+                    print(msg + " Using full set.")
+            elif model_subset_size < cur_n:
+                model_train_df = model_train_df.sample(n=model_subset_size, random_state=subset_seed + (11 if name=='qwen' else 0)).reset_index(drop=True)
+                print(f"[Step4][Subset] {name} fold {fold}: sampled {model_subset_size}/{cur_n} rows (seed offset).")
+            else:
+                print(f"[Step4][Subset] {name} fold {fold}: subset matches available {cur_n} rows.")
+        records_train = model_train_df.to_dict('records')
+        texts_train = [extract_text(r) for r in records_train]
+        rep = batched_lasttok_repr(model, tok, texts_train, max_len=min(getattr(tok,'model_max_length',1024),1024))
+        if rep is not None:
+            save_obj(f'model_save/teacher_logits/{name}_fold_{fold}_train_lasttok_logits.pt', rep)
+
+        if {'response_a','response_b'} <= set(model_train_df.columns):
+            prompts = [build_prompt(r) for r in records_train]
+            logp_a, logp_b = compute_pair_loglik(model, tok, prompts, [str(r.get('response_a','')) for r in records_train], [str(r.get('response_b','')) for r in records_train], max_len=1024)
+            logp_t = 0.5*(logp_a + logp_b)
+            raw = torch.stack([logp_a, logp_b, logp_t], dim=1)
+            probs = torch.softmax(raw, dim=1)
+            # Persist with per-model subset awareness: include mapping of original indices if present.
+            save_obj(f'model_save/teacher_logits/{name}_fold_{fold}_train_logprobs.pt', raw)
+            save_obj(f'model_save/teacher_logits/{name}_fold_{fold}_train_probs.pt', probs)
+            orig_idx_series = model_train_df.get('_orig_idx')
+            for ridx,(pa,pb,pt) in enumerate(probs.tolist()):
+                oof_rows.append({'fold':fold,'split':'train','model':name,'row_id':ridx,'pA':pa,'pB':pb,'pTie':pt,'orig_idx': int(orig_idx_series.iloc[ridx]) if orig_idx_series is not None else ridx})
+        else:
+            print(f"[Step4][Warn] response_a/response_b missing for train fold {fold} {name}")
+
+        if CALC_VAL and val_df is not None and {'response_a','response_b'} <= set(val_df.columns):
+            v_records = val_df.to_dict('records')
+            v_prompts = [build_prompt(r) for r in v_records]
+            v_logp_a, v_logp_b = compute_pair_loglik(model, tok, v_prompts, [str(r.get('response_a','')) for r in v_records], [str(r.get('response_b','')) for r in v_records], max_len=1024)
+            v_logp_t = 0.5*(v_logp_a + v_logp_b)
+            v_raw = torch.stack([v_logp_a, v_logp_b, v_logp_t], dim=1)
+            v_probs = torch.softmax(v_raw, dim=1)
+            save_obj(f'model_save/teacher_logits/{name}_fold_{fold}_val_logprobs.pt', v_raw)
+            save_obj(f'model_save/teacher_logits/{name}_fold_{fold}_val_probs.pt', v_probs)
+            for ridx,(pa,pb,pt) in enumerate(v_probs.tolist()):
+                oof_rows.append({'fold':fold,'split':'val','model':name,'row_id':ridx,'pA':pa,'pB':pb,'pTie':pt})
+
+        del model, tok
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+
+print('[Step4] Per-model/fold inference done.')
+
+if oof_rows:
+    oof_df = pd.DataFrame(oof_rows)
+    basis = oof_df[oof_df.split=='val'] if (oof_df['split']=='val').any() else oof_df
+    grp = basis.groupby(['fold','row_id'])[['pA','pB','pTie']].mean().reset_index()
+    torch.save(torch.tensor(grp[['pA','pB','pTie']].values, dtype=torch.float32), ENSEMBLE_OUT)
+    print(f"[Step4][Ensemble] Saved mean probs -> {ENSEMBLE_OUT} shape={(len(grp),3)}")
+    if OOF_TABLE.endswith('.parquet'):
+        oof_df.to_parquet(OOF_TABLE, index=False)
+    else:
+        oof_df.to_csv(OOF_TABLE, index=False)
+    print(f"[Step4][OOF] Table -> {OOF_TABLE} rows={len(oof_df)}")
+else:
+    print('[Step4][OOF] No rows; nothing saved.')
+
+print('[Step4] Finished.')
 PY
 
 echo "[Step4] Validating shapes"
