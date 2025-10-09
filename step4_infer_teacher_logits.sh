@@ -37,7 +37,7 @@ export HF_DATASETS_CACHE="${PWD}/.hf_cache"
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 python - <<'PY'
-import os, json, torch, pandas as pd, glob
+import os, json, torch, pandas as pd, glob, math, time
 from peft import PeftModel
 from transformers import AutoTokenizer, AutoModelForCausalLM
 
@@ -121,6 +121,7 @@ def extract_text(row):
     return (p+'\n' if p else '') + str(r).strip()
 
 def compute_pair_loglik(model, tokenizer, prompts, ra_list, rb_list, max_len=1024):
+    """Original per-example (kept for fallback)"""
     logp_a, logp_b = [], []
     model.eval()
     with torch.no_grad():
@@ -141,6 +142,49 @@ def compute_pair_loglik(model, tokenizer, prompts, ra_list, rb_list, max_len=102
                 tok_ll = lls.gather(-1, tgt.unsqueeze(-1)).squeeze(-1)
                 store.append(tok_ll.sum().item())
     return torch.tensor(logp_a), torch.tensor(logp_b)
+
+def compute_pair_loglik_batched(model, tokenizer, prompts, ra_list, rb_list, max_len=1024, batch_size=1, progress_every=100):
+    """Batched log-likelihood computation with progress logging.
+    We tokenize prompt+response in batches for A and then B separately to avoid memory blow-up.
+    """
+    n = len(prompts)
+    logp_a = torch.empty(n, dtype=torch.float32)
+    logp_b = torch.empty(n, dtype=torch.float32)
+    model.eval()
+    start = time.time()
+    with torch.no_grad():
+        for which, resp_list, target_store in [('A', ra_list, logp_a), ('B', rb_list, logp_b)]:
+            for i in range(0, n, batch_size):
+                j = i + batch_size
+                batch_prompts = prompts[i:j]
+                batch_resps = resp_list[i:j]
+                full_texts = []
+                prompt_lens = []
+                for p, resp in zip(batch_prompts, batch_resps):
+                    full = (p+'\n' if p else '') + resp
+                    full_texts.append(full)
+                    p_ids = tokenizer(p + ('\n' if p else ''), return_tensors='pt', truncation=True, max_length=max_len).input_ids
+                    prompt_lens.append(p_ids.shape[-1])
+                enc = tokenizer(full_texts, return_tensors='pt', truncation=True, max_length=max_len, padding=True)
+                input_ids = enc['input_ids'].to(DEVICE)
+                attn = enc['attention_mask'].to(DEVICE)
+                outputs = model(input_ids=input_ids, attention_mask=attn, use_cache=False)
+                logits = outputs.logits[:, :-1, :]
+                targets = input_ids[:, 1:]
+                lls = torch.nn.functional.log_softmax(logits, dim=-1)
+                for row_idx in range(input_ids.size(0)):
+                    p_len = prompt_lens[row_idx]
+                    # slice ensuring p_len-1 >=0
+                    resp_slice = slice(max(p_len-1,0), targets.shape[1])
+                    tgt_ids = targets[row_idx:row_idx+1, resp_slice]
+                    tok_ll = lls[row_idx:row_idx+1, resp_slice, :].gather(-1, tgt_ids.unsqueeze(-1)).squeeze(-1)
+                    target_store[i+row_idx] = tok_ll.sum().float().cpu()
+                if (i // batch_size) % max(1, progress_every) == 0:
+                    done = min(j, n)
+                    elapsed = time.time()-start
+                    rate = done/(elapsed+1e-6)
+                    print(f"[Step4][Progress] Resp{which} fold batch {done}/{n} ({rate:.2f} ex/s) elapsed={elapsed/60:.1f}m")
+    return logp_a, logp_b
 
 def batched_lasttok_repr(model, tokenizer, texts, max_len=512, batch_size=2):
     if not SAVE_LASTTOK:
@@ -339,7 +383,14 @@ for fold in FOLDS:
                 continue
         else:
             model = AutoModelForCausalLM.from_pretrained(mdir, device_map='auto', torch_dtype=torch.float16, trust_remote_code=True)
-        model.to(DEVICE)
+        # Safe placement: if accelerate assigned a device_map (offloading), do NOT call model.to(DEVICE)
+        if hasattr(model, 'hf_device_map'):
+            print('[Step4][Info] Accelerate device_map detected; skipping explicit model.to().')
+        else:
+            try:
+                model.to(DEVICE)
+            except RuntimeError as e:
+                print(f'[Step4][Warn] model.to({DEVICE}) failed (continuing with existing placement): {e}')
 
         # Apply per-model subset if specified (works off pre-global-sampled or global-sampled frame)
         model_subset_spec = llama_spec if name=='llama' else qwen_spec if name=='qwen' else ''
@@ -367,7 +418,15 @@ for fold in FOLDS:
 
         if {'response_a','response_b'} <= set(model_train_df.columns):
             prompts = [build_prompt(r) for r in records_train]
-            logp_a, logp_b = compute_pair_loglik(model, tok, prompts, [str(r.get('response_a','')) for r in records_train], [str(r.get('response_b','')) for r in records_train], max_len=1024)
+            batch_sz = int(os.environ.get('INFER_LOGPROB_BATCH','0') or '0')
+            progress_every = int(os.environ.get('INFER_PROGRESS_EVERY','50') or '50')
+            ra_inputs = [str(r.get('response_a','')) for r in records_train]
+            rb_inputs = [str(r.get('response_b','')) for r in records_train]
+            if batch_sz > 1:
+                print(f"[Step4] Using batched loglik batch_size={batch_sz} progress_every={progress_every}")
+                logp_a, logp_b = compute_pair_loglik_batched(model, tok, prompts, ra_inputs, rb_inputs, max_len=1024, batch_size=batch_sz, progress_every=progress_every)
+            else:
+                logp_a, logp_b = compute_pair_loglik(model, tok, prompts, ra_inputs, rb_inputs, max_len=1024)
             logp_t = 0.5*(logp_a + logp_b)
             raw = torch.stack([logp_a, logp_b, logp_t], dim=1)
             probs = torch.softmax(raw, dim=1)
@@ -383,7 +442,15 @@ for fold in FOLDS:
         if CALC_VAL and val_df is not None and {'response_a','response_b'} <= set(val_df.columns):
             v_records = val_df.to_dict('records')
             v_prompts = [build_prompt(r) for r in v_records]
-            v_logp_a, v_logp_b = compute_pair_loglik(model, tok, v_prompts, [str(r.get('response_a','')) for r in v_records], [str(r.get('response_b','')) for r in v_records], max_len=1024)
+            batch_sz = int(os.environ.get('INFER_LOGPROB_BATCH','0') or '0')
+            progress_every = int(os.environ.get('INFER_PROGRESS_EVERY','50') or '50')
+            va_inputs = [str(r.get('response_a','')) for r in v_records]
+            vb_inputs = [str(r.get('response_b','')) for r in v_records]
+            if batch_sz > 1:
+                print(f"[Step4] (val) Using batched loglik batch_size={batch_sz} progress_every={progress_every}")
+                v_logp_a, v_logp_b = compute_pair_loglik_batched(model, tok, v_prompts, va_inputs, vb_inputs, max_len=1024, batch_size=batch_sz, progress_every=progress_every)
+            else:
+                v_logp_a, v_logp_b = compute_pair_loglik(model, tok, v_prompts, va_inputs, vb_inputs, max_len=1024)
             v_logp_t = 0.5*(v_logp_a + v_logp_b)
             v_raw = torch.stack([v_logp_a, v_logp_b, v_logp_t], dim=1)
             v_probs = torch.softmax(v_raw, dim=1)

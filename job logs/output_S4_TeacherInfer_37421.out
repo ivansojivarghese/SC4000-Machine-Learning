@@ -1,0 +1,85 @@
+[Step4] SAVE_ROOT=/scratch-shared/tc1proj005/folds FOLDS=[0] MODELS=['llama', 'qwen'] SAVE_LASTTOK=False TOPK=0
+[Step4] Loaded data/fold_data/fold_0_train.csv rows=203656 cols=17
+[Step4][Warn] Empty CSV data/fold_data/fold_0_val.csv (0 bytes). Skipping.
+[Step4] Loading llama fold 0 from LoRA /scratch-shared/tc1proj005/folds/llama_fold_0_lora + base /scratch-shared/tc1proj005/post_pretrain_llama3-8b_merged
+[Step4][Info] Tokenizer source for llama fold 0: /scratch-shared/tc1proj005/folds/llama_fold_0_lora
+[Step4][Info] Accelerate device_map detected; skipping explicit model.to().
+[Step4][Subset] llama fold 0: sampled 12000/203656 rows (seed offset).
+[Step4] Using batched loglik batch_size=8 progress_every=50
+[Step4][Progress] RespA fold batch 8/12000 (4.42 ex/s) elapsed=0.0m
+[Step4][Progress] RespA fold batch 408/12000 (4.99 ex/s) elapsed=1.4m
+[Step4][Progress] RespA fold batch 808/12000 (5.06 ex/s) elapsed=2.7m
+[Step4][Progress] RespA fold batch 1208/12000 (5.19 ex/s) elapsed=3.9m
+[Step4][Progress] RespA fold batch 1608/12000 (5.20 ex/s) elapsed=5.1m
+[Step4][Progress] RespA fold batch 2008/12000 (5.24 ex/s) elapsed=6.4m
+[Step4][Progress] RespA fold batch 2408/12000 (5.32 ex/s) elapsed=7.5m
+[Step4][Progress] RespA fold batch 2808/12000 (5.27 ex/s) elapsed=8.9m
+[Step4][Progress] RespA fold batch 3208/12000 (5.28 ex/s) elapsed=10.1m
+[Step4][Progress] RespA fold batch 3608/12000 (5.27 ex/s) elapsed=11.4m
+[Step4][Progress] RespA fold batch 4008/12000 (5.27 ex/s) elapsed=12.7m
+[Step4][Progress] RespA fold batch 4408/12000 (5.29 ex/s) elapsed=13.9m
+[Step4][Progress] RespA fold batch 4808/12000 (5.29 ex/s) elapsed=15.1m
+[Step4][Progress] RespA fold batch 5208/12000 (5.31 ex/s) elapsed=16.3m
+[Step4][Progress] RespA fold batch 5608/12000 (5.32 ex/s) elapsed=17.6m
+[Step4][Progress] RespA fold batch 6008/12000 (5.32 ex/s) elapsed=18.8m
+[Step4][Progress] RespA fold batch 6408/12000 (5.30 ex/s) elapsed=20.1m
+[Step4][Progress] RespA fold batch 6808/12000 (5.27 ex/s) elapsed=21.5m
+[Step4][Progress] RespA fold batch 7208/12000 (5.26 ex/s) elapsed=22.8m
+[Step4][Progress] RespA fold batch 7608/12000 (5.29 ex/s) elapsed=24.0m
+[Step4][Progress] RespA fold batch 8008/12000 (5.30 ex/s) elapsed=25.2m
+[Step4][Progress] RespA fold batch 8408/12000 (5.27 ex/s) elapsed=26.6m
+[Step4][Progress] RespA fold batch 8808/12000 (5.28 ex/s) elapsed=27.8m
+[Step4][Progress] RespA fold batch 9208/12000 (5.28 ex/s) elapsed=29.1m
+[Step4][Progress] RespA fold batch 9608/12000 (5.31 ex/s) elapsed=30.1m
+[Step4][Progress] RespA fold batch 10008/12000 (5.32 ex/s) elapsed=31.3m
+[Step4][Progress] RespA fold batch 10408/12000 (5.31 ex/s) elapsed=32.7m
+[Step4][Progress] RespA fold batch 10808/12000 (5.31 ex/s) elapsed=33.9m
+[Step4][Progress] RespA fold batch 11208/12000 (5.31 ex/s) elapsed=35.2m
+[Step4][Progress] RespA fold batch 11608/12000 (5.30 ex/s) elapsed=36.5m
+[Step4][Progress] RespB fold batch 8/12000 (0.00 ex/s) elapsed=37.7m
+[Step4][Progress] RespB fold batch 408/12000 (0.17 ex/s) elapsed=39.1m
+[Step4][Progress] RespB fold batch 808/12000 (0.33 ex/s) elapsed=40.4m
+[Step4][Progress] RespB fold batch 1208/12000 (0.48 ex/s) elapsed=41.6m
+[Step4][Progress] RespB fold batch 1608/12000 (0.63 ex/s) elapsed=42.8m
+[Step4][Progress] RespB fold batch 2008/12000 (0.76 ex/s) elapsed=44.0m
+[Step4][Progress] RespB fold batch 2408/12000 (0.89 ex/s) elapsed=45.2m
+[Step4][Progress] RespB fold batch 2808/12000 (1.01 ex/s) elapsed=46.5m
+[Step4][Progress] RespB fold batch 3208/12000 (1.12 ex/s) elapsed=47.7m
+[Step4][Progress] RespB fold batch 3608/12000 (1.23 ex/s) elapsed=49.0m
+[Step4][Progress] RespB fold batch 4008/12000 (1.33 ex/s) elapsed=50.3m
+[Step4][Progress] RespB fold batch 4408/12000 (1.43 ex/s) elapsed=51.5m
+[Step4][Progress] RespB fold batch 4808/12000 (1.52 ex/s) elapsed=52.6m
+[Step4][Progress] RespB fold batch 5208/12000 (1.61 ex/s) elapsed=53.9m
+[Step4][Progress] RespB fold batch 5608/12000 (1.70 ex/s) elapsed=55.1m
+[Step4][Progress] RespB fold batch 6008/12000 (1.78 ex/s) elapsed=56.3m
+[Step4][Progress] RespB fold batch 6408/12000 (1.85 ex/s) elapsed=57.7m
+[Step4][Progress] RespB fold batch 6808/12000 (1.92 ex/s) elapsed=59.1m
+[Step4][Progress] RespB fold batch 7208/12000 (1.99 ex/s) elapsed=60.4m
+[Step4][Progress] RespB fold batch 7608/12000 (2.06 ex/s) elapsed=61.5m
+[Step4][Progress] RespB fold batch 8008/12000 (2.13 ex/s) elapsed=62.7m
+[Step4][Progress] RespB fold batch 8408/12000 (2.19 ex/s) elapsed=64.1m
+[Step4][Progress] RespB fold batch 8808/12000 (2.25 ex/s) elapsed=65.3m
+[Step4][Progress] RespB fold batch 9208/12000 (2.31 ex/s) elapsed=66.6m
+[Step4][Progress] RespB fold batch 9608/12000 (2.36 ex/s) elapsed=67.7m
+[Step4][Progress] RespB fold batch 10008/12000 (2.42 ex/s) elapsed=68.9m
+[Step4][Progress] RespB fold batch 10408/12000 (2.47 ex/s) elapsed=70.2m
+[Step4][Progress] RespB fold batch 10808/12000 (2.52 ex/s) elapsed=71.5m
+[Step4][Progress] RespB fold batch 11208/12000 (2.57 ex/s) elapsed=72.8m
+[Step4][Progress] RespB fold batch 11608/12000 (2.61 ex/s) elapsed=74.1m
+[Step4] Saved tensor -> model_save/teacher_logits/llama_fold_0_train_logprobs.pt shape=(12000, 3)
+[Step4] Saved tensor -> model_save/teacher_logits/llama_fold_0_train_probs.pt shape=(12000, 3)
+[Step4] Loading qwen fold 0 from LoRA /scratch-shared/tc1proj005/folds/qwen_fold_0_lora + base /scratch-shared/tc1proj005/post_pretrain_qwen2-72b_merged
+[Step4][Info] Tokenizer source for qwen fold 0: /scratch-shared/tc1proj005/folds/qwen_fold_0_lora
+[Step4][Info] Accelerate device_map detected; skipping explicit model.to().
+[Step4][Subset] qwen fold 0: sampled 200/203656 rows (seed offset).
+[Step4] Using batched loglik batch_size=8 progress_every=50
+[Step4][Progress] RespA fold batch 8/200 (1.13 ex/s) elapsed=0.1m
+[Step4][Progress] RespB fold batch 8/200 (0.04 ex/s) elapsed=3.3m
+[Step4] Saved tensor -> model_save/teacher_logits/qwen_fold_0_train_logprobs.pt shape=(200, 3)
+[Step4] Saved tensor -> model_save/teacher_logits/qwen_fold_0_train_probs.pt shape=(200, 3)
+[Step4] Per-model/fold inference done.
+[Step4][Ensemble] Saved mean probs -> model_save/teacher_logits/ensemble_oof_probs.pt shape=(12000, 3)
+[Step4][OOF] Table -> model_save/teacher_logits/oof_probs.parquet rows=12200
+[Step4] Finished.
+[Step4] Validating shapes
+[Step4] Done
