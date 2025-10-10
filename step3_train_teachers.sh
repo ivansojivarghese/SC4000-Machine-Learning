@@ -88,7 +88,7 @@ import json, pandas as pd, os
 KF='data/train.csv'
 EXT='data/ultrafeedback.csv'
 FOLDS_JSON=os.environ.get('FOLDS_JSON','data/processed_data/folds_5_seed42.json')
-import traceback, sys, time
+import traceback, sys, time, shutil
 sel_spec = os.environ.get('TEACHER_FOLDS','all')
 start=time.time()
 try:
@@ -147,23 +147,66 @@ try:
     tr_part=train_df[mask]
     print(f"[Step3][Prep][Fold {k}] Train subset shape={tr_part.shape}", flush=True)
     combined=pd.concat([tr_part, ext_df], ignore_index=True)
-    print(f"[Step3][Prep][Fold {k}] Combined shape={combined.shape} (will write)", flush=True)
-  print(f"[Step3][Prep][Fold {k}] Composition: kaggle_train_rows={tr_part.shape[0]} external_rows={ext_df.shape[0]} expected_total={tr_part.shape[0]+ext_df.shape[0]}", flush=True)
-  if combined.shape[0] != tr_part.shape[0] + ext_df.shape[0]:
-    print(f"[Step3][Prep][Fold {k}][Warn] Combined row count mismatch!", flush=True)
-    fold_train_tmp=os.path.join(write_root, f'fold_{k}_train.csv')
-    fold_val_tmp=os.path.join(write_root, f'fold_{k}_val.csv')
-    combined.to_csv(fold_train_tmp, index=False)
-    val_set.to_csv(fold_val_tmp, index=False)
-    # Mirror to project data directory
+    print(f"[Step3][Prep][Fold {k}] Combined shape={combined.shape}", flush=True)
+    print(f"[Step3][Prep][Fold {k}] Composition: kaggle_train_rows={tr_part.shape[0]} external_rows={ext_df.shape[0]} expected_total={tr_part.shape[0]+ext_df.shape[0]}", flush=True)
+    # Write per-fold CSVs with robust fallback if scratch has I/O issues
     proj_train=f'data/fold_data/fold_{k}_train.csv'
     proj_val=f'data/fold_data/fold_{k}_val.csv'
     os.makedirs('data/fold_data', exist_ok=True)
-    import shutil
-    shutil.copy2(fold_train_tmp, proj_train)
-    shutil.copy2(fold_val_tmp, proj_val)
-    sz_train=os.path.getsize(fold_train_tmp)
-    sz_val=os.path.getsize(fold_val_tmp)
+
+    def try_write(out_dir):
+      os.makedirs(out_dir, exist_ok=True)
+      t_path=os.path.join(out_dir, f'fold_{k}_train.csv')
+      v_path=os.path.join(out_dir, f'fold_{k}_val.csv')
+      combined.to_csv(t_path, index=False)
+      val_set.to_csv(v_path, index=False)
+      return t_path, v_path
+
+    fold_train_tmp = fold_val_tmp = None
+    tried = []
+    # Attempt 1: configured scratch
+    try:
+      fold_train_tmp, fold_val_tmp = try_write(write_root)
+      print(f"[Step3][Prep][Fold {k}] Wrote to scratch: {write_root}", flush=True)
+    except Exception as e1:
+      tried.append((write_root, str(e1)))
+      # Attempt 2: local project dir
+      local_dir='data/fold_data'
+      try:
+        fold_train_tmp, fold_val_tmp = try_write(local_dir)
+        print(f"[Step3][Prep][Fold {k}] Scratch write failed; wrote to local: {local_dir}", flush=True)
+      except Exception as e2:
+        tried.append((local_dir, str(e2)))
+        # Attempt 3: SLURM_TMPDIR if available
+        tmpdir=os.environ.get('SLURM_TMPDIR') or ''
+        if tmpdir:
+          td=os.path.join(tmpdir, 'fold_data')
+          try:
+            fold_train_tmp, fold_val_tmp = try_write(td)
+            print(f"[Step3][Prep][Fold {k}] Local write failed; wrote to SLURM_TMPDIR: {td}", flush=True)
+          except Exception as e3:
+            tried.append((td, str(e3)))
+        if fold_train_tmp is None or fold_val_tmp is None:
+          print(f"[Step3][Prep][Fold {k}][ERROR] All write attempts failed: {tried}", flush=True)
+          raise
+
+    # Mirror to project data directory (if not already there)
+    try:
+      if os.path.abspath(os.path.dirname(fold_train_tmp)) != os.path.abspath('data/fold_data'):
+        shutil.copy2(fold_train_tmp, proj_train)
+        shutil.copy2(fold_val_tmp, proj_val)
+      else:
+        # Already written to project dir
+        pass
+    except Exception as e_cp:
+      print(f"[Step3][Prep][Fold {k}][Warn] Copy to project dir failed: {e_cp}", flush=True)
+    try:
+      sz_train=os.path.getsize(fold_train_tmp)
+      sz_val=os.path.getsize(fold_val_tmp)
+    except Exception:
+      # Fallback to project copies for size reporting
+      sz_train=os.path.getsize(proj_train) if os.path.isfile(proj_train) else 0
+      sz_val=os.path.getsize(proj_val) if os.path.isfile(proj_val) else 0
     print(f"[Step3][Prep][Fold {k}] Wrote train={sz_train/1e6:.2f}MB val={sz_val/1e6:.2f}MB | {done}/{total} | {(time.time()-t0):.2f}s", flush=True)
   print('[Step3][Prep] Completed fold CSV generation in %.1fs' % (time.time()-start), flush=True)
 except Exception as e:
