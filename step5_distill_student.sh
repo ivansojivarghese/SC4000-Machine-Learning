@@ -39,17 +39,14 @@ STUDENT_MODEL=${STUDENT_MODEL_NAME:-google/gemma-2-9b-it}
 OUTDIR=${STUDENT_OUTDIR:-model_save/distilled_gemma2-9b_fold_${FOLD}}
 LR=${STUDENT_LR:-5e-5}
 EPOCHS=${STUDENT_EPOCHS:-2}
-# Increase per-device BS (4-bit + LoRA reduces memory)
-BATCH=${STUDENT_PER_DEVICE_BS:-2}
+BATCH=${STUDENT_PER_DEVICE_BS:-1}
 ACCUM=${STUDENT_GRAD_ACCUM:-16}
 T_SOFT=${STUDENT_T_SOFT:-3.0}
 ALPHA=${STUDENT_ALPHA:-0.7}
 MSE_W=${STUDENT_MSE_WEIGHT:-0.1}
 LABEL_SMOOTH=${STUDENT_LABEL_SMOOTH:-0.05}
-# Shorter sequences to improve tokens/sec
-MAXLEN=${STUDENT_MAXLEN:-320}
-# Disable step cap to honor full epochs unless the user overrides
-MAX_STEPS=${STUDENT_MAX_STEPS:--1}
+MAXLEN=${STUDENT_MAXLEN:-384}
+MAX_STEPS=${STUDENT_MAX_STEPS:-1000}
 
 if [ ! -f "$FOLD_TRAIN_CSV" ]; then
   echo "[Step5][Error] Missing fold train CSV: $FOLD_TRAIN_CSV. Run step3 first." >&2

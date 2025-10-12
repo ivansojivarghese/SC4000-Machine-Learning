@@ -204,10 +204,19 @@ INFER_FOLDS=4 INFER_MODELS=llama INFER_PREFER_LORA=1 INFER_LLAMA_SUBSET=15000-20
 
 Step 5:
 
-FOLDS=0 sbatch step5_distill_student.sh
--
 FOLDS=0 STUDENT_EPOCHS=2 sbatch step5_distill_student.sh
 
+OR
+
+FOLDS=0 sbatch step5_distill_student.sh
+-
+FOLDS=1 sbatch step5_distill_student.sh
+-
+FOLDS=2 sbatch step5_distill_student.sh
+-
+FOLDS=3 sbatch step5_distill_student.sh
+-
+FOLDS=4 sbatch step5_distill_student.sh
 
 
 Step 6:
