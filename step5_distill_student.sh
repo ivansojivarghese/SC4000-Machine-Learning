@@ -1,14 +1,15 @@
 #!/bin/bash
-# Step 5: Distill teacher logits into a student per fold, sequentially (train -> calibrate -> infer).
+# Step 5: Distill a 3-class student from teacher probabilities (LLaMA-only) per fold.
+# This script now uses student_train_distill_hf.py directly and aligns via OOF parquet from step4.
 # Usage:
-#   RUN=my_run sbatch step5_distill_student.sh
+#   sbatch --array=0-4 step5_distill_student.sh
 
 #SBATCH --partition=UGGPU-TC1
 #SBATCH --qos=normal
 #SBATCH --gres=gpu:1
-#SBATCH --mem=32G
+#SBATCH --mem=64G
 #SBATCH --nodes=1
-#SBATCH --time=1440
+#SBATCH --time=360
 #SBATCH --cpus-per-task=8
 #SBATCH --job-name=S5_Distill
 #SBATCH --output=output_%x_%j.out
@@ -16,7 +17,7 @@
 
 set -euo pipefail
 
-RUN=${RUN:-$(date +%Y%m%d_%H%M%S)}
+FOLD=${FOLDS:-${SLURM_ARRAY_TASK_ID:-0}}
 
 module load anaconda
 eval "$(conda shell.bash hook)"
@@ -30,37 +31,55 @@ export TOKENIZERS_PARALLELISM=false
 export HF_DATASETS_CACHE="${PWD}/.hf_cache"
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
-for FOLD in 0 1 2 3 4; do
-  echo "[Step5] RUN=${RUN} FOLD=${FOLD}"
-  TEACHERS="model_save/llama3-70b_fold_${FOLD}/teacher_logits_fold_${FOLD}.npy,model_save/qwen2-72b_fold_${FOLD}/teacher_logits_fold_${FOLD}.npy"
-  MODEL_DIR="model_save/${RUN}/student_distilbert_fold_${FOLD}"
-  SUB_FILE="sub/${RUN}_student_submission_fold_${FOLD}.csv"
+echo "[Step5] Distilling fold ${FOLD} using LLaMA-only OOF probs"
 
-  python ./main.py --mode student-distill-train \
-    --student-model microsoft/deberta-v3-base \
-    --student-epochs 2 \
-    --student-label-smoothing 0.05 \
-    --student-early-stopping 1 \
-    --student-max-length 256 \
-    --student-train-batch-size 12 \
-    --student-eval-batch-size 12 \
-    --student-grad-accum 2 \
-    --student-fp16 \
-    --student-gradient-checkpointing \
-    --student-num-workers 8 \
-    --student-extra-csvs "data/ultrafeedback.csv,data/ultrafeedback_ties.csv,data/lmsys-33k-deduplicated.csv" \
-    --student-dedup-by-prompt \
-    --student-shuffle-ab \
-    --student-output-model-dir "${MODEL_DIR}" \
-    --distill-alpha 0.7 \
-    --distill-temp 3.0 \
-    --distill-mse-weight 0.1 \
-    --cv-num-folds 5 \
-    --cv-fold-idx ${FOLD} \
-    --distill-teachers "${TEACHERS}"
+OOF_PATH=${INFER_OOF_TABLE:-model_save/teacher_logits/oof_probs.parquet}
+FOLD_TRAIN_CSV=data/fold_data/fold_${FOLD}_train.csv
+STUDENT_MODEL=${STUDENT_MODEL_NAME:-google/gemma-2-9b-it}
+OUTDIR=${STUDENT_OUTDIR:-model_save/distilled_gemma2-9b_fold_${FOLD}}
+LR=${STUDENT_LR:-5e-5}
+EPOCHS=${STUDENT_EPOCHS:-2}
+# Increase per-device BS (4-bit + LoRA reduces memory)
+BATCH=${STUDENT_PER_DEVICE_BS:-2}
+ACCUM=${STUDENT_GRAD_ACCUM:-16}
+T_SOFT=${STUDENT_T_SOFT:-3.0}
+ALPHA=${STUDENT_ALPHA:-0.7}
+MSE_W=${STUDENT_MSE_WEIGHT:-0.1}
+LABEL_SMOOTH=${STUDENT_LABEL_SMOOTH:-0.05}
+# Shorter sequences to improve tokens/sec
+MAXLEN=${STUDENT_MAXLEN:-320}
+# Disable step cap to honor full epochs unless the user overrides
+MAX_STEPS=${STUDENT_MAX_STEPS:--1}
 
-  python ./main.py --mode student-calibrate --student-output-model-dir "${MODEL_DIR}"
-  python ./main.py --mode student-infer --student-output-model-dir "${MODEL_DIR}" --student-submission-path "${SUB_FILE}"
-done
+if [ ! -f "$FOLD_TRAIN_CSV" ]; then
+  echo "[Step5][Error] Missing fold train CSV: $FOLD_TRAIN_CSV. Run step3 first." >&2
+  exit 3
+fi
+if [ ! -f "$OOF_PATH" ]; then
+  echo "[Step5][Error] Missing OOF table produced by step4: $OOF_PATH" >&2
+  exit 4
+fi
 
-echo "[Step5] Done"
+python -u student_train_distill_hf.py \
+  --fold_train_csv "$FOLD_TRAIN_CSV" \
+  --teacher_oof_table "$OOF_PATH" \
+  --teacher_model_name llama \
+  --output_dir "$OUTDIR" \
+  --model_name "$STUDENT_MODEL" \
+  --learning_rate $LR \
+  --num_epochs $EPOCHS \
+  --max_steps $MAX_STEPS \
+  --per_device_train_batch_size $BATCH \
+  --per_device_eval_batch_size $BATCH \
+  --gradient_accumulation_steps $ACCUM \
+  --T_soft $T_SOFT \
+  --alpha $ALPHA \
+  --mse_weight $MSE_W \
+  --label_smoothing $LABEL_SMOOTH \
+  --max_length $MAXLEN \
+  --fp16 --gradient_checkpointing --use_fast_tokenizer \
+  --load_in_4bit --use_lora --lora_r 16 --lora_alpha 32 --lora_dropout 0.05 \
+  --dataloader_num_workers 4 \
+  --num_folds 5 --fold_idx $FOLD
+
+echo "[Step5] Done fold $FOLD -> $OUTDIR"
