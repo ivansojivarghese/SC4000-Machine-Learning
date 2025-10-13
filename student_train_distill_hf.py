@@ -746,7 +746,8 @@ def train_student_distill(
 
     trainer.add_callback(_TempUpdater())
 
-    trainer.train()
+    # trainer.train()
+    trainer.train(resume_from_checkpoint=f"model_save/distilled_gemma2-9b_fold_{fold_idx}/checkpoint-1000")
     metrics = trainer.evaluate()
     # Persist CV metrics for ensembling weights
     try:

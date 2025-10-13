@@ -35,7 +35,7 @@ echo "[Step5] Distilling fold ${FOLD} using LLaMA-only OOF probs"
 
 OOF_PATH=${INFER_OOF_TABLE:-model_save/teacher_logits/oof_probs.parquet}
 FOLD_TRAIN_CSV=data/fold_data/fold_${FOLD}_train.csv
-RESUME_CHECKPOINT=model_save/distilled_gemma2-9b_fold_${FOLD}/checkpoint-1000
+# RESUME_CHECKPOINT=model_save/distilled_gemma2-9b_fold_${FOLD}/checkpoint-1000
 STUDENT_MODEL=${STUDENT_MODEL_NAME:-google/gemma-2-9b-it}
 OUTDIR=${STUDENT_OUTDIR:-model_save/distilled_gemma2-9b_fold_${FOLD}}
 LR=${STUDENT_LR:-5e-5}
@@ -62,7 +62,6 @@ python -u student_train_distill_hf.py \
   --fold_train_csv "$FOLD_TRAIN_CSV" \
   --teacher_oof_table "$OOF_PATH" \
   --teacher_model_name llama \
-  --resume_from_checkpoint "$RESUME_CHECKPOINT" \
   --output_dir "$OUTDIR" \
   --model_name "$STUDENT_MODEL" \
   --learning_rate $LR \
