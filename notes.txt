@@ -217,6 +217,8 @@ FOLDS=2 sbatch step5_distill_student.sh
 FOLDS=3 sbatch step5_distill_student.sh
 -
 FOLDS=4 sbatch step5_distill_student.sh
+-
+TO RESUME ALL FOLDS ABOVE (EACH CUR. AT 0.39 EPOCHS - TOO LOW)
 
 
 
@@ -235,4 +237,10 @@ sbatch step7_quantize_gptq.sh
 
 Step 8:
 
+sbatch step8_infer_tta.sh
+
+
+
 Step 9:
+
+sbatch step9_eval.sh

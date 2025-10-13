@@ -25,11 +25,13 @@ cd ~/exported-assets_sc4000
 MODEL_DIR=${MODEL_DIR:-model_save/final_merged_model}
 OUT_DIR=${OUT_DIR:-model_save/final_quantized_model}
 CALIB_CSV=${CALIB_CSV:-./data/train.csv}
+TOKENIZER_DIR=${TOKENIZER_DIR:-google/gemma-2-9b-it}
 # Use 8-bit per the summary, keep group size reasonable
 python quantize_gptq_calibrated.py \
   --model-dir "$MODEL_DIR" \
   --out-dir "$OUT_DIR" \
   --calib-csv "$CALIB_CSV" \
+  --tokenizer-dir "$TOKENIZER_DIR" \
   --bits 8 \
   --group-size 128 \
   --max-calib-samples 2048 \

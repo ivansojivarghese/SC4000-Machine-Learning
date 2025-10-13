@@ -1,6 +1,7 @@
 import argparse
 import os
 import random
+import json
 from typing import List, Dict
 
 import numpy as np
@@ -9,8 +10,11 @@ from transformers import AutoTokenizer
 import torch
 
 try:
-    from auto_gptq import AutoGPTQForCausalLM, BaseQuantizeConfig
-except Exception as e:
+    import importlib
+    _gptq = importlib.import_module('auto_gptq')
+    AutoGPTQForCausalLM = getattr(_gptq, 'AutoGPTQForCausalLM', None)
+    BaseQuantizeConfig = getattr(_gptq, 'BaseQuantizeConfig', None)
+except Exception:
     AutoGPTQForCausalLM = None
     BaseQuantizeConfig = None
 
@@ -96,6 +100,7 @@ def quantize_with_calibration(
     max_length: int = 512,
     seed: int = 42,
     use_safetensors: bool = True,
+    tokenizer_dir: str = '',
 ):
     if AutoGPTQForCausalLM is None:
         raise RuntimeError("auto-gptq is not installed or failed to import. Please ensure it is available in your environment.")
@@ -105,20 +110,87 @@ def quantize_with_calibration(
     random.seed(seed)
     np.random.seed(seed)
 
-    tokenizer = AutoTokenizer.from_pretrained(base_model_dir, use_fast=True)
+    # Robust tokenizer resolution: prefer explicit tokenizer_dir, then base dir, then env, then model id fallback
+    def _has_tok_files(p: str) -> bool:
+        try:
+            return os.path.isdir(p) and any(os.path.isfile(os.path.join(p, fn)) for fn in (
+                'tokenizer.model','tokenizer.json','tokenizer_config.json'
+            ))
+        except Exception:
+            return False
+    tok_candidates = []
+    if tokenizer_dir:
+        tok_candidates.append(tokenizer_dir)
+    tok_candidates.append(base_model_dir)
+    env_tok = os.environ.get('TOKENIZER_DIR')
+    if env_tok:
+        tok_candidates.append(env_tok)
+    env_base = os.environ.get('BASE_MODEL')
+    if env_base:
+        tok_candidates.append(env_base)
+    # Last resort: common HF id for Gemma-2 9B
+    tok_candidates.append('google/gemma-2-9b-it')
+    last_err = None
+    tokenizer = None
+    for cand in tok_candidates:
+        try:
+            # Try fast first, then slow
+            tokenizer = AutoTokenizer.from_pretrained(cand, use_fast=True, trust_remote_code=True)
+            break
+        except Exception as e:
+            last_err = e
+            try:
+                tokenizer = AutoTokenizer.from_pretrained(cand, use_fast=False, trust_remote_code=True)
+                break
+            except Exception as e2:
+                last_err = e2
+                continue
+    if tokenizer is None:
+        raise RuntimeError(f"Failed to load tokenizer. Tried candidates: {tok_candidates}. Last error: {last_err}")
 
-    quantize_config = BaseQuantizeConfig(
-        bits=bits,
-        group_size=group_size,
-        desc_act=desc_act,
-    )
+    quantize_config = None
+    if BaseQuantizeConfig is not None:
+        quantize_config = BaseQuantizeConfig(
+            bits=bits,
+            group_size=group_size,
+            desc_act=desc_act,
+        )
 
-    # Load base model on CPU by default (AutoGPTQ does this implicitly)
-    model = AutoGPTQForCausalLM.from_pretrained(
-        base_model_dir,
-        quantize_config,
-        device_map='auto',
-    )
+    # Try GPTQ; if unsupported (e.g., gemma2), fall back to exporting a BNB int8 config for runtime loading
+    try:
+        if AutoGPTQForCausalLM is None or quantize_config is None:
+            raise RuntimeError("AutoGPTQ not available")
+        # Load base model on CPU/GPU automatically
+        model = AutoGPTQForCausalLM.from_pretrained(
+            base_model_dir,
+            quantize_config,
+            device_map='auto',
+            trust_remote_code=True,
+        )
+    except Exception as e:
+        # Fallback path: create a lightweight directory that signals BNB int8 loading at inference time
+        warn = f"[quantize_gptq] AutoGPTQ unsupported or failed: {e}. Falling back to BitsAndBytes int8 runtime."
+        print(warn)
+        meta = {
+            "method": "BNB_INT8",
+            "reason": str(e),
+            "bits": 8,
+            "group_size": group_size,
+            "desc_act": desc_act,
+            "base_model_dir": base_model_dir,
+        }
+        with open(os.path.join(out_dir, 'quantization_config.json'), 'w') as f:
+            json.dump(meta, f, indent=2)
+        # record the target (float) model dir for inference redirection
+        with open(os.path.join(out_dir, 'target_model_dir.txt'), 'w') as f:
+            f.write(str(base_model_dir).strip() + "\n")
+        # also save tokenizer for consistency
+        try:
+            tokenizer.save_pretrained(out_dir)
+        except Exception:
+            pass
+        # Nothing else to do in fallback
+        return
 
     # Build calibration set and run quantization
     examples = make_calibration_examples(
@@ -134,6 +206,12 @@ def quantize_with_calibration(
     model.quantize(examples)
 
     model.save_quantized(out_dir, use_safetensors=use_safetensors)
+    # record successful GPTQ for downstream tools
+    try:
+        with open(os.path.join(out_dir, 'quantization_config.json'), 'w') as f:
+            json.dump({"method": "GPTQ", "bits": bits, "group_size": group_size, "desc_act": desc_act}, f, indent=2)
+    except Exception:
+        pass
     tokenizer.save_pretrained(out_dir)
 
 
@@ -149,6 +227,7 @@ def main():
     ap.add_argument('--max-calib-samples', type=int, default=1024)
     ap.add_argument('--max-length', type=int, default=512)
     ap.add_argument('--seed', type=int, default=42)
+    ap.add_argument('--tokenizer-dir', type=str, default='', help='Explicit tokenizer path or HF id to use if model-dir lacks tokenizer files')
     ap.add_argument('--no-safetensors', action='store_true', help='Disable safetensors when saving')
     args = ap.parse_args()
 
@@ -164,6 +243,7 @@ def main():
         max_length=args.max_length,
         seed=args.seed,
         use_safetensors=not args.no_safetensors,
+        tokenizer_dir=args.tokenizer_dir,
     )
 
 

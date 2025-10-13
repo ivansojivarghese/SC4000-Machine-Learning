@@ -25,10 +25,12 @@ import pandas as pd
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
-from transformers import AutoTokenizer
+from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 
 try:
-    from auto_gptq import AutoGPTQForCausalLM
+    import importlib
+    _gptq = importlib.import_module('auto_gptq')
+    AutoGPTQForCausalLM = getattr(_gptq, 'AutoGPTQForCausalLM', None)
 except Exception:
     AutoGPTQForCausalLM = None
 
@@ -102,8 +104,7 @@ def infer(
     device: Optional[str] = None,
     temperature_json: Optional[str] = None,
 ):
-    if AutoGPTQForCausalLM is None:
-        raise RuntimeError("auto-gptq is not installed. Please install auto-gptq to use this script.")
+    # We'll try AutoGPTQ, but support a graceful fallback to BitsAndBytes int8 if needed
 
     os.makedirs(os.path.dirname(submission_path), exist_ok=True)
 
@@ -115,11 +116,39 @@ def infer(
 
     tokenizer = AutoTokenizer.from_pretrained(model_dir, use_fast=True)
     dev = torch.device(device or ('cuda' if torch.cuda.is_available() else 'cpu'))
+    # Detect GPTQ vs BNB fallback by metadata files
+    use_bnb_int8 = False
+    meta_json = os.path.join(model_dir, 'quantization_config.json')
+    if os.path.exists(meta_json):
+        try:
+            with open(meta_json, 'r') as f:
+                meta = json.load(f)
+            if str(meta.get('method','')).upper() == 'BNB_INT8':
+                use_bnb_int8 = True
+        except Exception:
+            pass
 
-    model = AutoGPTQForCausalLM.from_quantized(
-        model_dir,
-        device_map='auto' if dev.type == 'cuda' else None,
-    )
+    if use_bnb_int8:
+        # Read target base model directory and load with BitsAndBytes int8
+        target_file = os.path.join(model_dir, 'target_model_dir.txt')
+        if not os.path.exists(target_file):
+            raise RuntimeError("BNB_INT8 fallback selected but target_model_dir.txt not found in quantized dir")
+        with open(target_file, 'r') as f:
+            target_dir = f.read().strip()
+        bnb_cfg = BitsAndBytesConfig(load_in_8bit=True)
+        model = AutoModelForCausalLM.from_pretrained(
+            target_dir,
+            quantization_config=bnb_cfg,
+            device_map='auto' if dev.type == 'cuda' else None,
+            trust_remote_code=True,
+        )
+    else:
+        if AutoGPTQForCausalLM is None:
+            raise RuntimeError("auto-gptq is not installed. Please install auto-gptq or re-run quantization to produce BNB_INT8 fallback.")
+        model = AutoGPTQForCausalLM.from_quantized(
+            model_dir,
+            device_map='auto' if dev.type == 'cuda' else None,
+        )
     model.eval()
 
     # Hidden size discovery via config if available
