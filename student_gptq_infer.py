@@ -18,7 +18,7 @@ Notes:
 import argparse
 import json
 import os
-from typing import Optional, List
+from typing import Optional, List, Dict
 
 import numpy as np
 import pandas as pd
@@ -52,6 +52,27 @@ def load_temperature(calibration_json_path: Optional[str]) -> float:
         return 1.0
 
 
+def _normalize_head_state(state: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+    # Prefer original_module.* if present, else modules_to_save.default.*, else identity
+    keys = state.keys()
+    out: Dict[str, torch.Tensor] = {}
+    # Weight
+    if 'original_module.weight' in keys:
+        out['weight'] = state['original_module.weight']
+    elif 'modules_to_save.default.weight' in keys:
+        out['weight'] = state['modules_to_save.default.weight']
+    elif 'weight' in keys:
+        out['weight'] = state['weight']
+    # Bias
+    if 'original_module.bias' in keys:
+        out['bias'] = state['original_module.bias']
+    elif 'modules_to_save.default.bias' in keys:
+        out['bias'] = state['modules_to_save.default.bias']
+    elif 'bias' in keys:
+        out['bias'] = state['bias']
+    return out if out else state
+
+
 def extract_classifier_from_dir(classifier_dir: str, num_labels: int = 3) -> nn.Module:
     """
     Attempt to extract a classifier head from a fine-tuned sequence classification directory by
@@ -73,6 +94,7 @@ def extract_classifier_from_dir(classifier_dir: str, num_labels: int = 3) -> nn.
     head_path = os.path.join(classifier_dir, 'classifier_head.pt')
     if os.path.exists(head_path):
         state = torch.load(head_path, map_location='cpu')
+        state = _normalize_head_state(state)
         try:
             head.load_state_dict(state)
         except Exception:
@@ -83,11 +105,15 @@ def extract_classifier_from_dir(classifier_dir: str, num_labels: int = 3) -> nn.
 def load_classifier_head(head_path: Optional[str], classifier_from_dir: Optional[str], hidden_size: int, num_labels: int = 3) -> nn.Module:
     if head_path and os.path.exists(head_path):
         state = torch.load(head_path, map_location='cpu')
-        head = nn.Linear(hidden_size, num_labels)
-        head.load_state_dict(state)
+        state = _normalize_head_state(state)
+        has_bias = 'bias' in state
+        head = nn.Linear(hidden_size, num_labels, bias=has_bias)
+        # Load with strict=False to tolerate missing bias or extra keys
+        head.load_state_dict(state, strict=False)
         return head
     if classifier_from_dir:
-        return extract_classifier_from_dir(classifier_from_dir, num_labels=num_labels)
+        head = extract_classifier_from_dir(classifier_from_dir, num_labels=num_labels)
+        return head
     # default randomly initialized head
     return nn.Linear(hidden_size, num_labels)
 
@@ -192,6 +218,9 @@ def infer(
                 else:
                     pooled = (last_hidden * enc['attention_mask'].unsqueeze(-1)).sum(dim=1) / enc['attention_mask'].sum(dim=1, keepdim=True)
 
+                # Align dtypes to avoid matmul Half vs Float errors
+                if pooled.dtype != head.weight.dtype:
+                    pooled = pooled.to(head.weight.dtype)
                 logits = head(pooled)
                 if temperature != 1.0:
                     logits = logits / temperature
