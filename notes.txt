@@ -219,9 +219,19 @@ FOLDS=3 sbatch step5_distill_student.sh
 FOLDS=4 sbatch step5_distill_student.sh
 
 
+
 Step 6:
 
+sbatch step6_lora_ensemble.sh
+
+
+
 Step 7: 
+
+sbatch step7_quantize_gptq.sh
+
+
+
 
 Step 8:
 

@@ -1,12 +1,12 @@
 #!/bin/bash
-# Step 7: Quantize final model to 8-bit (GPTQ with calibration)
+# Step 7: Quantize final merged model to 8-bit (GPTQ with calibration)
 # Usage:
 #   sbatch step7_quantize_gptq.sh
 
 #SBATCH --partition=UGGPU-TC1
 #SBATCH --qos=normal
 #SBATCH --gres=gpu:1
-#SBATCH --mem=32G
+#SBATCH --mem=48G
 #SBATCH --nodes=1
 #SBATCH --time=180
 #SBATCH --cpus-per-task=4
@@ -22,13 +22,17 @@ conda activate myenv
 
 cd ~/exported-assets_sc4000
 
+MODEL_DIR=${MODEL_DIR:-model_save/final_merged_model}
+OUT_DIR=${OUT_DIR:-model_save/final_quantized_model}
+CALIB_CSV=${CALIB_CSV:-./data/train.csv}
+# Use 8-bit per the summary, keep group size reasonable
 python quantize_gptq_calibrated.py \
-  --model-dir model_save/final_merged_model \
-  --out-dir model_save/final_quantized_model \
-  --calib-csv ./data/train.csv \
-  --bits 4 \
+  --model-dir "$MODEL_DIR" \
+  --out-dir "$OUT_DIR" \
+  --calib-csv "$CALIB_CSV" \
+  --bits 8 \
   --group-size 128 \
-  --max-calib-samples 1024 \
-  --max-length 512
+  --max-calib-samples 2048 \
+  --max-length 1024
 
 echo "[Step7] Done"

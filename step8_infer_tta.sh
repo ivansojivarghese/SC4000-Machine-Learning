@@ -1,5 +1,5 @@
 #!/bin/bash
-# Step 8: Apply TTA during inference (GPTQ CausalLM + classification head adapter)
+# Step 8: Apply TTA during inference (GPTQ 8-bit CausalLM + classification head)
 # Usage:
 #   sbatch step8_infer_tta.sh
 
@@ -22,21 +22,26 @@ conda activate myenv
 
 cd ~/exported-assets_sc4000
 
-# Export a classification head from your best seq-classifier (if not already saved)
-if [ ! -f model_save/student_distilbert/classifier_head.pt ]; then
+HEAD_DIR=${HEAD_DIR:-model_save/distilled_gemma2-9b_fold_0}
+HEAD_OUT=${HEAD_OUT:-${HEAD_DIR}/classifier_head.pt}
+if [ ! -f "$HEAD_OUT" ]; then
   python export_classifier_head.py \
-    --model-dir ./model_save/student_distilbert \
-    --out ./model_save/student_distilbert/classifier_head.pt || true
+    --model-dir "$HEAD_DIR" \
+    --out "$HEAD_OUT" || true
 fi
 
+MODEL_DIR=${MODEL_DIR:-./model_save/final_quantized_model}
+TEST_CSV=${TEST_CSV:-./data/test.csv}
+OUT_SUB=${OUT_SUB:-./sub/final_submission.csv}
+CALIB_JSON=${CALIB_JSON:-${HEAD_DIR}/calibration.json}
 python student_gptq_infer.py \
-  --model-dir ./model_save/final_quantized_model \
-  --test-csv ./data/test.csv \
-  --out ./sub/final_submission.csv \
-  --head-path ./model_save/student_distilbert/classifier_head.pt \
-  --tta-lengths 512,1024 \
-  --batch-size 8 \
-  --max-length 1024 \
-  --temperature-json ./model_save/student_distilbert/calibration.json
+  --model-dir "$MODEL_DIR" \
+  --test-csv "$TEST_CSV" \
+  --out "$OUT_SUB" \
+  --head-path "$HEAD_OUT" \
+  --tta-lengths 2000 \
+  --batch-size 4 \
+  --max-length 2000 \
+  --temperature-json "$CALIB_JSON"
 
-echo "[Step8] Wrote ./sub/final_submission.csv"
+echo "[Step8] Wrote $OUT_SUB"

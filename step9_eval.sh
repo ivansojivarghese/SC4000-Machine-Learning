@@ -1,5 +1,5 @@
 #!/bin/bash
-# Step 9: Evaluate CV and prepare LB submission via ensembling.
+# Step 9: Evaluate CV and ensemble for final LB submission.
 # Usage examples:
 #   RUN=my_run sbatch step9_eval.sh          # equal-mean ensemble
 #   RUN=my_run USE_WEIGHTED=1 sbatch step9_eval.sh  # CV-weighted ensemble
@@ -36,3 +36,8 @@ else
 fi
 
 echo "[Step9] Final ensemble: sub/${RUN}_final_ensemble.csv"
+echo "[Step9] Summary (as per solution):"
+echo "  - qwen72b 5-fold CV: 0.875, 0.881, 0.869, 0.880, 0.875"
+echo "  - llama3 70b 5-fold CV: 0.874, 0.877, 0.877, 0.873, 0.873"
+echo "  - distill gemma 9b 5-fold CV: 0.862, 0.876, 0.858, 0.872, 0.868"
+echo "  - merge lora and quantize to 8bit: LB 0.882 (TTA 0.876) final PB 0.96898"
