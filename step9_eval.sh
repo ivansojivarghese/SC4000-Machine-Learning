@@ -22,17 +22,37 @@ USE_WEIGHTED=${USE_WEIGHTED:-0}
 
 cd ~/exported-assets_sc4000
 
+mkdir -p sub
+
 if [ "$USE_WEIGHTED" -eq 1 ]; then
   echo "[Step9] CV-weighted ensemble for RUN=${RUN}"
   python ensemble_from_cv.py --run ${RUN} --out sub/${RUN}_final_ensemble.csv
 else
   echo "[Step9] Equal-mean ensemble for RUN=${RUN}"
-  python ensemble_submissions.py sub/${RUN}_final_ensemble.csv \
-    sub/${RUN}_student_submission_fold_0.csv \
-    sub/${RUN}_student_submission_fold_1.csv \
-    sub/${RUN}_student_submission_fold_2.csv \
-    sub/${RUN}_student_submission_fold_3.csv \
-    sub/${RUN}_student_submission_fold_4.csv
+  # Discover available per-fold submissions for this RUN; if none, fall back to final/student submission
+  mapfile -t FOLD_FILES < <(ls sub/${RUN}_student_submission_fold_*.csv 2>/dev/null || true)
+  if [ ${#FOLD_FILES[@]} -eq 0 ]; then
+    echo "[Step9][Warn] No per-fold files found for RUN=${RUN}. Falling back to existing submission(s)."
+    if [ -f sub/final_submission.csv ]; then
+      cp sub/final_submission.csv sub/${RUN}_final_ensemble.csv
+      echo "[Step9] Copied sub/final_submission.csv -> sub/${RUN}_final_ensemble.csv"
+    elif [ -f sub/student_submission.csv ]; then
+      cp sub/student_submission.csv sub/${RUN}_final_ensemble.csv
+      echo "[Step9] Copied sub/student_submission.csv -> sub/${RUN}_final_ensemble.csv"
+    else
+      echo "[Step9][Error] No submissions found in sub/. Expected per-fold files or final_submission.csv"
+      ls -la sub || true
+      exit 1
+    fi
+  else
+    if [ ${#FOLD_FILES[@]} -eq 1 ]; then
+      cp "${FOLD_FILES[0]}" sub/${RUN}_final_ensemble.csv
+      echo "[Step9] Single submission found; copied ${FOLD_FILES[0]} -> sub/${RUN}_final_ensemble.csv"
+    else
+      echo "[Step9] Ensembling ${#FOLD_FILES[@]} file(s): ${FOLD_FILES[*]}"
+      python ensemble_submissions.py sub/${RUN}_final_ensemble.csv "${FOLD_FILES[@]}"
+    fi
+  fi
 fi
 
 echo "[Step9] Final ensemble: sub/${RUN}_final_ensemble.csv"

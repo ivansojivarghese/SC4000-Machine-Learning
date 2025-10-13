@@ -1,9 +1,9 @@
 import pandas as pd
 import numpy as np
 import sys
-from typing import List
+from typing import List, Optional
 
-def ensemble_submissions(paths: List[str], out_path: str, weights: List[float] | None = None) -> str:
+def ensemble_submissions(paths: List[str], out_path: str, weights: Optional[List[float]] = None) -> str:
     if not paths:
         raise ValueError("No submission paths provided")
     dfs = [pd.read_csv(p) for p in paths]
