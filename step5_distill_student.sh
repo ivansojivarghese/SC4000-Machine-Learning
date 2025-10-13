@@ -35,6 +35,7 @@ echo "[Step5] Distilling fold ${FOLD} using LLaMA-only OOF probs"
 
 OOF_PATH=${INFER_OOF_TABLE:-model_save/teacher_logits/oof_probs.parquet}
 FOLD_TRAIN_CSV=data/fold_data/fold_${FOLD}_train.csv
+RESUME_CHECKPOINT=model_save/distilled_gemma2-9b_fold_${FOLD}/checkpoint-1000
 STUDENT_MODEL=${STUDENT_MODEL_NAME:-google/gemma-2-9b-it}
 OUTDIR=${STUDENT_OUTDIR:-model_save/distilled_gemma2-9b_fold_${FOLD}}
 LR=${STUDENT_LR:-5e-5}
@@ -46,7 +47,7 @@ ALPHA=${STUDENT_ALPHA:-0.7}
 MSE_W=${STUDENT_MSE_WEIGHT:-0.1}
 LABEL_SMOOTH=${STUDENT_LABEL_SMOOTH:-0.05}
 MAXLEN=${STUDENT_MAXLEN:-384}
-MAX_STEPS=${STUDENT_MAX_STEPS:-1000}
+MAX_STEPS=${STUDENT_MAX_STEPS:-2600}
 
 if [ ! -f "$FOLD_TRAIN_CSV" ]; then
   echo "[Step5][Error] Missing fold train CSV: $FOLD_TRAIN_CSV. Run step3 first." >&2
@@ -61,6 +62,7 @@ python -u student_train_distill_hf.py \
   --fold_train_csv "$FOLD_TRAIN_CSV" \
   --teacher_oof_table "$OOF_PATH" \
   --teacher_model_name llama \
+  --resume_from_checkpoint "$RESUME_CHECKPOINT" \
   --output_dir "$OUTDIR" \
   --model_name "$STUDENT_MODEL" \
   --learning_rate $LR \

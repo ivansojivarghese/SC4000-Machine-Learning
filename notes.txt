@@ -243,4 +243,4 @@ sbatch step8_infer_tta.sh
 
 Step 9:
 
-sbatch step9_eval.sh
+sbatch step9_eval.sh (NOT VERY USEFUL)
