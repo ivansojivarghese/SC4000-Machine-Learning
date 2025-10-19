@@ -38,6 +38,7 @@ from scipy.special import softmax
 from sklearn.metrics import log_loss
 import time
 import argparse
+import re
 try:
     from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 except Exception:
@@ -431,6 +432,13 @@ def train_student_distill(
     lora_alpha: int = 16,
     lora_dropout: float = 0.05,
     max_steps: Optional[int] = None,
+    # Checkpointing / resume controls
+    resume_from_checkpoint: Optional[str] = None,
+    evaluation_strategy: str = 'epoch',
+    save_strategy: str = 'epoch',
+    save_steps: Optional[int] = None,
+    save_total_limit: int = 1,
+    logging_steps: int = 20,
 ):
     # Validate inputs
     if not teacher_logits and not (teacher_oof_table and fold_train_csv):
@@ -586,13 +594,13 @@ def train_student_distill(
         per_device_eval_batch_size=per_device_eval_batch_size,
         gradient_accumulation_steps=gradient_accumulation_steps,
         num_train_epochs=num_epochs,
-        evaluation_strategy='epoch',
-        save_strategy='epoch',
-        save_total_limit=1,
+        evaluation_strategy=evaluation_strategy,
+        save_strategy=save_strategy,
+        save_total_limit=int(save_total_limit),
         load_best_model_at_end=True,
         metric_for_best_model='log_loss',
         greater_is_better=False,
-        logging_steps=20,
+        logging_steps=int(logging_steps),
         label_smoothing_factor=0.0,  # handled in CE above
         fp16=fp16,
         bf16=bf16,
@@ -630,10 +638,12 @@ def train_student_distill(
     # If evaluation_strategy isn't allowed but save_strategy is, avoid setting save_strategy to prevent mismatch
     if ('evaluation_strategy' not in allowed) and ('save_strategy' in allowed):
         base_kwargs.pop('save_strategy', None)
-    # If both evaluation_strategy and save_strategy are supported, ensure they match
+    # If both evaluation_strategy and save_strategy are supported, honor provided values
     if ('evaluation_strategy' in allowed) and ('save_strategy' in allowed):
-        base_kwargs['evaluation_strategy'] = 'epoch'
-        base_kwargs['save_strategy'] = 'epoch'
+        base_kwargs['evaluation_strategy'] = evaluation_strategy
+        base_kwargs['save_strategy'] = save_strategy
+        if save_strategy == 'steps' and ('save_steps' in allowed) and (save_steps is not None):
+            base_kwargs['save_steps'] = int(save_steps)
     if 'group_by_length' not in allowed:
         base_kwargs.pop('group_by_length', None)
     if 'report_to' not in allowed:
@@ -746,8 +756,39 @@ def train_student_distill(
 
     trainer.add_callback(_TempUpdater())
 
-    # trainer.train()
-    trainer.train(resume_from_checkpoint=f"model_save/distilled_gemma2-9b_fold_{fold_idx}/checkpoint-4200")
+    # Train (auto-resume if not explicitly provided)
+    def _find_latest_checkpoint(dir_path: str) -> Optional[str]:
+        try:
+            if not os.path.isdir(dir_path):
+                return None
+            ckpts = []
+            for name in os.listdir(dir_path):
+                if name.startswith('checkpoint-'):
+                    m = re.match(r'^checkpoint-(\d+)$', name)
+                    if m:
+                        step = int(m.group(1))
+                        ckpt_dir = os.path.join(dir_path, name)
+                        # Consider it complete if trainer_state.json exists (most indicative)
+                        state_ok = os.path.isfile(os.path.join(ckpt_dir, 'trainer_state.json'))
+                        if state_ok:
+                            ckpts.append((step, ckpt_dir))
+            if not ckpts:
+                return None
+            ckpts.sort(key=lambda x: x[0], reverse=True)
+            return ckpts[0][1]
+        except Exception:
+            return None
+
+    auto_resume = None
+    if resume_from_checkpoint in (None, "", "none"):
+        auto_resume = _find_latest_checkpoint(output_dir)
+        if auto_resume:
+            logger.info(f"[Distill] Auto-resuming from latest checkpoint: {auto_resume}")
+            resume_from_checkpoint = auto_resume
+        else:
+            logger.info("[Distill] No resume checkpoint provided and none found in output_dir; starting fresh.")
+
+    trainer.train(resume_from_checkpoint=resume_from_checkpoint)
     metrics = trainer.evaluate()
     # Persist CV metrics for ensembling weights
     try:
@@ -803,6 +844,13 @@ if __name__ == '__main__':
     parser.add_argument('--lora_r', type=int, default=8)
     parser.add_argument('--lora_alpha', type=int, default=16)
     parser.add_argument('--lora_dropout', type=float, default=0.05)
+    # Checkpoint/resume controls
+    parser.add_argument('--resume_from_checkpoint', type=str, default=None)
+    parser.add_argument('--evaluation_strategy', type=str, default='epoch', choices=['no','steps','epoch'])
+    parser.add_argument('--save_strategy', type=str, default='epoch', choices=['no','steps','epoch'])
+    parser.add_argument('--save_steps', type=int, default=None)
+    parser.add_argument('--save_total_limit', type=int, default=1)
+    parser.add_argument('--logging_steps', type=int, default=20)
 
     args = parser.parse_args()
 
@@ -845,5 +893,11 @@ if __name__ == '__main__':
         lora_r=args.lora_r,
         lora_alpha=args.lora_alpha,
         lora_dropout=args.lora_dropout,
+        resume_from_checkpoint=args.resume_from_checkpoint,
+        evaluation_strategy=args.evaluation_strategy,
+        save_strategy=args.save_strategy,
+        save_steps=args.save_steps,
+        save_total_limit=args.save_total_limit,
+        logging_steps=args.logging_steps,
     )
     print({'eval': metrics})

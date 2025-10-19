@@ -48,6 +48,14 @@ MSE_W=${STUDENT_MSE_WEIGHT:-0.1}
 LABEL_SMOOTH=${STUDENT_LABEL_SMOOTH:-0.05}
 MAXLEN=${STUDENT_MAXLEN:-384}
 MAX_STEPS=${STUDENT_MAX_STEPS:-5800}
+RESUME_CHECKPOINT=${RESUME_CHECKPOINT:-}
+OVERWRITE=${STUDENT_OVERWRITE:-0}
+
+# Optional fresh start: wipe OUTDIR when OVERWRITE=1 and not resuming
+if [ "$OVERWRITE" = "1" ] && [ -d "$OUTDIR" ] && [ -z "${RESUME_CHECKPOINT}" ]; then
+  echo "[Step5] OVERWRITE=1 -> removing existing OUTDIR: $OUTDIR"
+  rm -rf "$OUTDIR"
+fi
 
 if [ ! -f "$FOLD_TRAIN_CSV" ]; then
   echo "[Step5][Error] Missing fold train CSV: $FOLD_TRAIN_CSV. Run step3 first." >&2
@@ -79,5 +87,10 @@ python -u student_train_distill_hf.py \
   --load_in_4bit --use_lora --lora_r 16 --lora_alpha 32 --lora_dropout 0.05 \
   --dataloader_num_workers 4 \
   --num_folds 5 --fold_idx $FOLD
+  --evaluation_strategy epoch \
+  --save_strategy epoch \
+  --save_total_limit 1 \
+  --logging_steps 50 \
+  ${RESUME_CHECKPOINT:+--resume_from_checkpoint "$RESUME_CHECKPOINT"}
 
 echo "[Step5] Done fold $FOLD -> $OUTDIR"
