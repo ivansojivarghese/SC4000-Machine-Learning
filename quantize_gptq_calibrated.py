@@ -206,10 +206,19 @@ def quantize_with_calibration(
     model.quantize(examples)
 
     model.save_quantized(out_dir, use_safetensors=use_safetensors)
-    # record successful GPTQ for downstream tools
+    # record successful GPTQ for downstream tools (and keep a reference to the base model)
     try:
         with open(os.path.join(out_dir, 'quantization_config.json'), 'w') as f:
-            json.dump({"method": "GPTQ", "bits": bits, "group_size": group_size, "desc_act": desc_act}, f, indent=2)
+            json.dump({
+                "method": "GPTQ",
+                "bits": bits,
+                "group_size": group_size,
+                "desc_act": desc_act,
+                "base_model_dir": base_model_dir,
+            }, f, indent=2)
+        # also store a plain text pointer to the base model dir for robust fallbacks
+        with open(os.path.join(out_dir, 'base_model_dir.txt'), 'w') as f:
+            f.write(str(base_model_dir).strip() + "\n")
     except Exception:
         pass
     tokenizer.save_pretrained(out_dir)

@@ -26,6 +26,13 @@ MODEL_DIR=${MODEL_DIR:-model_save/final_merged_model}
 OUT_DIR=${OUT_DIR:-model_save/final_quantized_model}
 CALIB_CSV=${CALIB_CSV:-./data/train.csv}
 TOKENIZER_DIR=${TOKENIZER_DIR:-google/gemma-2-9b-it}
+# Sanity check: ensure merged model contains weights
+if [ -d "$MODEL_DIR" ]; then
+  if ! ls "$MODEL_DIR" | grep -E "(pytorch_model\.bin|model\.safetensors|pytorch_model-.*\.bin|model-.*\.safetensors|pytorch_model\.bin\.index\.json|model\.safetensors\.index\.json)" > /dev/null 2>&1; then
+    echo "[Step7][Error] No weight files found in $MODEL_DIR. Re-run Step 6 to merge LoRA into a base with standard filenames."
+    exit 1
+  fi
+fi
 # Use 8-bit per the summary, keep group size reasonable
 python quantize_gptq_calibrated.py \
   --model-dir "$MODEL_DIR" \

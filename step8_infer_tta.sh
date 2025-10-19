@@ -37,17 +37,21 @@ MODEL_DIR=${MODEL_DIR:-./model_save/final_quantized_model}
 TEST_CSV=${TEST_CSV:-./data/test.csv}
 OUT_SUB=${OUT_SUB:-./sub/final_submission.csv}
 CALIB_JSON=${CALIB_JSON:-${HEAD_DIR}/calibration.json}
+# Optional explicit base model for fallback if GPTQ shards are corrupted
+FALLBACK_BASE=${FALLBACK_BASE:-model_save/final_merged_model}
 CMD=(python student_gptq_infer.py \
   --model-dir "$MODEL_DIR" \
   --test-csv "$TEST_CSV" \
   --out "$OUT_SUB" \
   --head-path "$HEAD_OUT" \
   --classifier-from-dir "$HEAD_DIR" \
+  --fallback-base-model-dir "$FALLBACK_BASE" \
   --tta-lengths 2000 \
   --batch-size 4 \
   --max-length 2000 \
   --temperature-json "$CALIB_JSON")
 
+export BASE_MODEL="$FALLBACK_BASE"
 "${CMD[@]}"
 
 echo "[Step8] Wrote $OUT_SUB"

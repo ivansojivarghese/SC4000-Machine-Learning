@@ -129,6 +129,7 @@ def infer(
     max_length: int = 512,
     device: Optional[str] = None,
     temperature_json: Optional[str] = None,
+    fallback_base_model_dir: Optional[str] = None,
 ):
     # We'll try AutoGPTQ, but support a graceful fallback to BitsAndBytes int8 if needed
 
@@ -161,20 +162,154 @@ def infer(
             raise RuntimeError("BNB_INT8 fallback selected but target_model_dir.txt not found in quantized dir")
         with open(target_file, 'r') as f:
             target_dir = f.read().strip()
+        # Build candidate base models list for robust fallback
+        candidates: List[str] = [target_dir]
+        # 1) Explicit CLI arg
+        if 'fallback_base_model_dir' in locals() and fallback_base_model_dir:
+            candidates.append(fallback_base_model_dir)
+        # 2) Environment override
+        env_base = os.environ.get('BASE_MODEL') or os.environ.get('FALLBACK_BASE_MODEL_DIR')
+        if env_base:
+            candidates.append(env_base)
+        # 3) Metadata hint (tokenizer source)
+        tok_src = None
+        try:
+            with open(os.path.join(model_dir, 'quantization_config.json'), 'r') as f:
+                meta = json.load(f)
+                tok_src = meta.get('tokenizer_source') or meta.get('tokenizer_dir') or meta.get('tokenizer')
+        except Exception:
+            tok_src = None
+        if tok_src:
+            candidates.append(str(tok_src))
+        # Dedup while preserving order
+        seen = set()
+        candidates = [c for c in candidates if c and (c not in seen and not seen.add(c))]
+        # Optional: log likely-corrupt safetensors files (size==0)
+        try:
+            st_files = [p for p in os.listdir(target_dir) if p.endswith('.safetensors')]
+            for name in st_files:
+                fp = os.path.join(target_dir, name)
+                try:
+                    if os.path.getsize(fp) == 0:
+                        print(f"[Warn] Zero-byte safetensors file detected: {fp}; loading may fail. Consider re-merging/re-quantizing.")
+                except Exception:
+                    pass
+        except Exception:
+            pass
         bnb_cfg = BitsAndBytesConfig(load_in_8bit=True)
-        model = AutoModelForCausalLM.from_pretrained(
-            target_dir,
-            quantization_config=bnb_cfg,
-            device_map='auto' if dev.type == 'cuda' else None,
-            trust_remote_code=True,
-        )
+        last_err = None
+        loaded = False
+        for cand in candidates:
+            # Quick check: if cand is a local dir without weight files, skip to next
+            if os.path.isdir(cand):
+                names = os.listdir(cand)
+                has_weights = any(
+                    n in names for n in (
+                        'pytorch_model.bin','model.safetensors','tf_model.h5','model.ckpt.index','flax_model.msgpack','pytorch_model.bin.index.json','model.safetensors.index.json'
+                    )
+                ) or any(n.startswith('pytorch_model-') and n.endswith('.bin') for n in names) or any(n.startswith('model-') and n.endswith('.safetensors') for n in names)
+                if not has_weights:
+                    print(f"[Info] Skipping base candidate without weight files: {cand}")
+                    continue
+            print(f"[Info] Trying BNB int8 load from: {cand}")
+            try:
+                try:
+                    model = AutoModelForCausalLM.from_pretrained(
+                        cand,
+                        quantization_config=bnb_cfg,
+                        device_map='auto' if dev.type == 'cuda' else None,
+                        trust_remote_code=True,
+                        use_safetensors=True,
+                    )
+                except Exception as e1:
+                    msg = str(e1)
+                    if 'safetensors' in msg.lower() or 'invalid json in header' in msg.lower():
+                        print('[Info] Safetensors load failed; retrying with use_safetensors=False to use .bin shards if available...')
+                        model = AutoModelForCausalLM.from_pretrained(
+                            cand,
+                            quantization_config=bnb_cfg,
+                            device_map='auto' if dev.type == 'cuda' else None,
+                            trust_remote_code=True,
+                            use_safetensors=False,
+                        )
+                    else:
+                        raise
+                loaded = True
+                break
+            except Exception as e2:
+                last_err = e2
+                print(f"[Warn] BNB int8 load failed for {cand}: {e2}")
+                continue
+        if not loaded:
+            raise RuntimeError(
+                'Failed to load base model for BNB int8. Provide a valid float base model via --fallback-base-model-dir or BASE_MODEL env var, '
+                f'or fix the directory listed in target_model_dir.txt. Last error: {last_err}'
+            )
     else:
         if AutoGPTQForCausalLM is None:
             raise RuntimeError("auto-gptq is not installed. Please install auto-gptq or re-run quantization to produce BNB_INT8 fallback.")
-        model = AutoGPTQForCausalLM.from_quantized(
-            model_dir,
-            device_map='auto' if dev.type == 'cuda' else None,
-        )
+        try:
+            model = AutoGPTQForCausalLM.from_quantized(
+                model_dir,
+                device_map='auto' if dev.type == 'cuda' else None,
+            )
+        except Exception as e:
+            msg = str(e)
+            # Attempt graceful fallback to BNB int8 if GPTQ shards look corrupted
+            if 'safetensors' in msg.lower() or 'invalid json in header' in msg.lower():
+                print('[Warn] GPTQ safetensors load failed; attempting BNB int8 fallback using a float base model...')
+                # Resolve candidate base model dirs
+                candidates: List[str] = []
+                if fallback_base_model_dir:
+                    candidates.append(fallback_base_model_dir)
+                env_base = os.environ.get('BASE_MODEL') or os.environ.get('FALLBACK_BASE_MODEL_DIR')
+                if env_base:
+                    candidates.append(env_base)
+                for name in ('target_model_dir.txt', 'base_model_dir.txt'):
+                    fp = os.path.join(model_dir, name)
+                    if os.path.exists(fp):
+                        try:
+                            with open(fp, 'r') as f:
+                                candidates.append(f.read().strip())
+                        except Exception:
+                            pass
+                tried = []
+                last_err = None
+                for cand in candidates:
+                    if not cand or cand in tried:
+                        continue
+                    tried.append(cand)
+                    print(f"[Info] Trying BNB int8 load from base model: {cand}")
+                    try:
+                        bnb_cfg = BitsAndBytesConfig(load_in_8bit=True)
+                        try:
+                            model = AutoModelForCausalLM.from_pretrained(
+                                cand,
+                                quantization_config=bnb_cfg,
+                                device_map='auto' if dev.type == 'cuda' else None,
+                                trust_remote_code=True,
+                                use_safetensors=True,
+                            )
+                        except Exception:
+                            model = AutoModelForCausalLM.from_pretrained(
+                                cand,
+                                quantization_config=bnb_cfg,
+                                device_map='auto' if dev.type == 'cuda' else None,
+                                trust_remote_code=True,
+                                use_safetensors=False,
+                            )
+                        break
+                    except Exception as e2:
+                        last_err = e2
+                        continue
+                else:
+                    raise RuntimeError(
+                        'Failed to load GPTQ model due to safetensors error and could not fall back to BNB int8. '
+                        'Provide --fallback-base-model-dir or set BASE_MODEL to the float base model directory. '
+                        f'Original error: {e}\nLast fallback error: {last_err}'
+                    )
+            else:
+                raise
     model.eval()
 
     # Hidden size discovery via config if available
@@ -256,6 +391,7 @@ def main():
     ap.add_argument('--max-length', type=int, default=512)
     ap.add_argument('--device', default=None)
     ap.add_argument('--temperature-json', default=None, help='Optional explicit path to calibration.json')
+    ap.add_argument('--fallback-base-model-dir', default=None, help='Optional float base model directory to use if GPTQ loading fails')
     args = ap.parse_args()
 
     tta = [int(x) for x in args.tta_lengths.split(',') if x.strip()] if args.tta_lengths else None
@@ -271,6 +407,7 @@ def main():
         max_length=args.max_length,
         device=args.device,
         temperature_json=args.temperature_json,
+        fallback_base_model_dir=args.fallback_base_model_dir,
     )
 
 
