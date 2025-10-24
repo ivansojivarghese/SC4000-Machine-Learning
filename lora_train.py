@@ -3,7 +3,7 @@ import json
 from typing import Optional
 
 import torch
-from transformers import AutoTokenizer, AutoModelForCausalLM, TrainingArguments, Trainer, TrainerCallback
+from transformers import AutoTokenizer, AutoModelForSequenceClassification, TrainingArguments, Trainer, TrainerCallback
 from datasets import load_dataset
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 from transformers import BitsAndBytesConfig
@@ -102,7 +102,7 @@ def train_lora(
         lora_dropout=lora_dropout,
         target_modules="all-linear",
         bias="none",
-        task_type="CAUSAL_LM",
+        task_type="SEQ_CLS",
     )
     model = get_peft_model(model, lora_cfg)
 
@@ -154,23 +154,55 @@ def train_lora(
         else:
             print(f"[INFO] subset_size={subset_size} -> ignoring and using full dataset of {len(ds['train'])} examples")
 
-    pad_token_id = tokenizer.pad_token_id
-    def build_text(ex):
-        prompt = ex.get("prompt") or ex.get("question") or ""
-        resp = ex.get("chosen") or ex.get("response") or ex.get("answer") or ""
-        text = (str(prompt).strip() + "\n" if prompt else "") + str(resp).strip()
-        encoded = tokenizer(
-            text,
-            truncation=True,
-            max_length=max_length,
-            padding="max_length",
-        )
-        input_ids = encoded["input_ids"]
-        labels = [tid if tid != pad_token_id else -100 for tid in input_ids]
-        encoded["labels"] = labels
-        return encoded
+    # For ultrafeedback_mini.csv: for each row, create two examples (chosen=label 0, rejected=label 1)
 
-    tokenized = ds["train"].map(build_text, batched=False)
+    def build_examples_from_row(row):
+        prompt = row.get("prompt") or row.get("question") or ""
+        chosen = row.get("chosen") or ""
+        rejected = row.get("rejected") or ""
+        examples = []
+        # Detect tie: if chosen == rejected (after stripping whitespace), label=2
+        if chosen.strip() and rejected.strip() and chosen.strip() == rejected.strip():
+            text = (str(prompt).strip() + "\n" if prompt else "") + str(chosen).strip()
+            encoded = tokenizer(
+                text,
+                truncation=True,
+                max_length=max_length,
+                padding="max_length",
+            )
+            encoded["labels"] = 2  # tie
+            examples.append(encoded)
+        else:
+            if chosen:
+                text = (str(prompt).strip() + "\n" if prompt else "") + str(chosen).strip()
+                encoded = tokenizer(
+                    text,
+                    truncation=True,
+                    max_length=max_length,
+                    padding="max_length",
+                )
+                encoded["labels"] = 0  # chosen is A (label 0)
+                examples.append(encoded)
+            if rejected:
+                text = (str(prompt).strip() + "\n" if prompt else "") + str(rejected).strip()
+                encoded = tokenizer(
+                    text,
+                    truncation=True,
+                    max_length=max_length,
+                    padding="max_length",
+                )
+                encoded["labels"] = 1  # rejected is B (label 1)
+                examples.append(encoded)
+        return examples
+
+    # Flatten all examples from all rows
+    all_examples = []
+    for ex in ds["train"]:
+        all_examples.extend(build_examples_from_row(ex))
+
+    # Convert to HuggingFace Dataset
+    from datasets import Dataset
+    tokenized = Dataset.from_list(all_examples)
 
     # If max_steps provided (>0), we let Trainer cap steps and ignore epochs after reaching it.
     # Trainer expects an int for max_steps; use -1 (default behavior) instead of None
