@@ -67,6 +67,8 @@ def train_lora(
 
     # Allow passing a HF token via env if needed; step1 passes token at login level already
     hf_token = os.environ.get("HF_TOKEN") or os.environ.get("HUGGINGFACE_TOKEN")
+
+    from transformers import AutoModelForSequenceClassification
     from functools import partial
     model_kwargs = dict(
         device_map="auto",
@@ -75,13 +77,16 @@ def train_lora(
         token=hf_token,
         trust_remote_code=True,
         local_files_only=False,
+        num_labels=3,
+        id2label={0: "A", 1: "B", 2: "tie"},
+        label2id={"A": 0, "B": 1, "tie": 2},
     )
     if attn_impl:
         model_kwargs["attn_implementation"] = attn_impl
     if load_8bit and not qlora:
         # Only use 8-bit when not already doing 4bit QLoRA
         model_kwargs["load_in_8bit"] = True
-    model = AutoModelForCausalLM.from_pretrained(base_model, **model_kwargs)
+    model = AutoModelForSequenceClassification.from_pretrained(base_model, **model_kwargs)
 
     # Prepare model for k-bit training in both 4-bit (QLoRA) and 8-bit LoRA scenarios
     if qlora or load_8bit:
