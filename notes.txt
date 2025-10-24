@@ -11,9 +11,7 @@ Step 8: Apply TTA during inference
 Step 9: Evaluate CV and LB
 
 
-HF token:
-
-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
+HF token: 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
 
 
 Commands:
@@ -22,74 +20,26 @@ conda activate myenv
 conda deactivate myenv
 module load anaconda
 
+---
 
 Step 1:
 
-Here are the exact commands to submit one model at a time to your scratch. Run these on the cluster login node (bash), from the repo folder.
-
 # Gemma
 RUN_STAGE=gemma SCRATCH_BASE=/scratch-shared/tc1proj005 sbatch step1_post_pretrain.sh
-OR
-RUN_STAGE=gemma SCRATCH_BASE=/scratch-shared/tc1proj005 POSTPRE_EPOCHS=1 POSTPRE_LR=1e-5 sbatch step1_post_pretrain.sh
-OR
-POSTPRE_SUBSET_SIZE=30000 POSTPRE_GRAD_ACCUM=16 POSTPRE_MAXLEN=512 RUN_STAGE=gemma SCRATCH_BASE=/scratch-shared/tc1proj005 sbatch step1_post_pretrain.sh
-OR
-export RUN_STAGE=gemma
-export POSTPRE_MAXLEN=512
-export POSTPRE_SUBSET_SIZE=8000
-export POSTPRE_PER_DEVICE_BS=2
-export POSTPRE_GRAD_ACCUM=16
-export POSTPRE_LORA_R=16
-export POSTPRE_LORA_ALPHA=32
-export POSTPRE_EPOCHS=1
-export POSTPRE_MAX_STEPS=-1          # allow auto-cap
-export POSTPRE_TIME_BUDGET_HOURS=6
-export POSTPRE_DISABLE_CHKPT=1
-sbatch step1_post_pretrain.sh
 
 # Qwen
 RUN_STAGE=qwen SCRATCH_BASE=/scratch-shared/tc1proj005 sbatch step1_post_pretrain.sh
-OR
-export RUN_STAGE=qwen
-export POSTPRE_FORCE_MAX_STEPS=240
-export POSTPRE_MAXLEN=512
-export POSTPRE_SUBSET_SIZE=6000
-export POSTPRE_LORA_R=16
-export POSTPRE_LORA_ALPHA=32
-export POSTPRE_PER_DEVICE_BS=1
-export POSTPRE_GRAD_ACCUM=12
-export POSTPRE_DISABLE_CHKPT=1
-export POSTPRE_MAX_STEPS=-1
-sbatch step1_post_pretrain.sh
-AND
-export RUN_STAGE=qwen
-export POSTPRE_MERGE_ONLY=1
-sbatch step1_post_pretrain.sh
 
 # LLaMA
 RUN_STAGE=llama SCRATCH_BASE=/scratch-shared/tc1proj005 sbatch step1_post_pretrain.sh
-OR
-export RUN_STAGE=llama
-unset POSTPRE_MERGE_ONLY
-unset POSTPRE_SKIP_IF_EXISTS
-export POSTPRE_FORCE_MAX_STEPS=370
-export POSTPRE_MAXLEN=512
-export POSTPRE_SUBSET_SIZE=6000
-export POSTPRE_LORA_R=32
-export POSTPRE_LORA_ALPHA=64
-export POSTPRE_PER_DEVICE_BS=1
-export POSTPRE_GRAD_ACCUM=12
-# Keep gradient checkpointing ON (do NOT set POSTPRE_DISABLE_CHKPT)
-sbatch step1_post_pretrain.sh
 
-
+---
 
 Step 2:
+
 sbatch step2_make_folds.sh
-OR
-sbatch --export=ALL,SCRATCH_BASE=/scratch-shared/tc1proj005 step2_make_folds.sh
 
-
+---
 
 Step 3:
 export TEACHER_LORA_R=16

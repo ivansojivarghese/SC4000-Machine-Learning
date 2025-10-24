@@ -62,7 +62,7 @@ else:
 PY
 
 KF=data/train.csv
-EXT=data/ultrafeedback.csv
+EXT=data/lmsys-33k-deduplicated.csv
 # Allow override: export FOLDS_JSON=/path/to/folds_5_seed42.json
 FOLDS_JSON=${FOLDS_JSON:-data/processed_data/folds_5_seed42.json}
 if [ ! -f "$FOLDS_JSON" ]; then
@@ -86,7 +86,7 @@ else
   python -u <<'PY'
 import json, pandas as pd, os
 KF='data/train.csv'
-EXT='data/ultrafeedback.csv'
+EXT='data/lmsys-33k-deduplicated.csv'
 FOLDS_JSON=os.environ.get('FOLDS_JSON','data/processed_data/folds_5_seed42.json')
 import traceback, sys, time, shutil
 sel_spec = os.environ.get('TEACHER_FOLDS','all')
