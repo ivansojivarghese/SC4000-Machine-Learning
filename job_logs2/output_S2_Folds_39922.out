@@ -1,0 +1,10 @@
+[Step2] wrote data/processed_data/folds_5_seed42.json
+[Step2] Loaded extra 33k dataset: data/lmsys-33k-deduplicated.csv | rows=21187 cols=['id', 'model_a', 'model_b', 'prompt', 'response_a', 'response_b', 'winner_model_a', 'winner_model_b']...
+[Step2] Fold 0: train rows=67168 (kaggle=45981 + extra=21187), val rows=11496
+[Step2] Fold 1: train rows=67168 (kaggle=45981 + extra=21187), val rows=11496
+[Step2] Fold 2: train rows=67169 (kaggle=45982 + extra=21187), val rows=11495
+[Step2] Fold 3: train rows=67169 (kaggle=45982 + extra=21187), val rows=11495
+[Step2] Fold 4: train rows=67169 (kaggle=45982 + extra=21187), val rows=11495
+[Step2] Copied folds JSON to /scratch-shared/tc1proj005/folds/folds_5_seed42.json
+[Step2] Scratch folds file present: /scratch-shared/tc1proj005/folds/folds_5_seed42.json
+[Step2] Done

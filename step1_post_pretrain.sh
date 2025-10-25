@@ -291,6 +291,7 @@ case "${RUN_STAGE}" in
     require_space_gb 40
     clean_hf_cache
     echo "[Step1] Gemma2-9B LoRA: starting"
+    POSTPRE_MAX_STEPS=100
     GEMMA_ARGS=(
       --base-model "${GEMMA_BASE}"
       --output-dir "${OUT_BASE}/post_pretrain_gemma2-9b_lora"
@@ -334,10 +335,10 @@ case "${RUN_STAGE}" in
     ;;
 
   qwen)
-    # Secondary safeguard: if user didn't force max steps and auto produced >200, clamp to 200
-    if [ -z "${POSTPRE_FORCE_MAX_STEPS}" ] && [ "${POSTPRE_MAX_STEPS}" != "-1" ] && [ "${POSTPRE_MAX_STEPS}" -gt 200 ]; then
-      echo "[Step1][Clamp] Reducing Qwen max steps from ${POSTPRE_MAX_STEPS} to 200 to fit time budget." >&2
-      POSTPRE_MAX_STEPS=200
+    # Secondary safeguard: if user didn't force max steps and auto produced >100, clamp to 100
+    if [ -z "${POSTPRE_FORCE_MAX_STEPS}" ] && [ "${POSTPRE_MAX_STEPS}" != "-1" ] && [ "${POSTPRE_MAX_STEPS}" -gt 100 ]; then
+      echo "[Step1][Clamp] Reducing Qwen max steps from ${POSTPRE_MAX_STEPS} to 100 to fit time budget." >&2
+      POSTPRE_MAX_STEPS=100
     fi
     require_space_gb 180
     clean_hf_cache

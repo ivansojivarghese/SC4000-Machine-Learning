@@ -1,0 +1,34 @@
+[Step1] Resolving SCRATCH_BASE...
+[Debug] SCRATCH_BASE resolved to: /scratch-shared/tc1proj005
+[Step1] Working dir: /home/UG/ivansoji001/exported-assets_sc4000
+[Step1] Home dir: /home/UG/ivansoji001
+[Step1] SCRATCH_BASE: /scratch-shared/tc1proj005
+[Step1] HF_HOME: /scratch-shared/tc1proj005
+[Step1] HUGGINGFACE_HUB_CACHE: /scratch-shared/tc1proj005
+[Step1] HF_DATASETS_CACHE: /scratch-shared/tc1proj005
+[Step1] TRANSFORMERS_CACHE: /scratch-shared/tc1proj005
+[Step1] UT_DATA: data/ultrafeedback.csv | EPOCHS: 1 | LR: 1e-5 | MAXLEN: 1024 | PER_DEVICE_BS: 1 | MAX_STEPS: -1 | LORA_R: 64 | LORA_ALPHA: 128
+[Step1][AutoCap] Projected 84471 steps (~1126h) exceeds budget 6h; capping to 450.
+[Step1] Deps OK
+[Step1] Online mode enabled (TRANSFORMERS_OFFLINE=0)
+[Step1] Downloading tokenizer files for Qwen/Qwen2.5-7B-Instruct...
+[Step1] Tokenizer snapshot at: /scratch-shared/tc1proj005/models--Qwen--Qwen2.5-7B-Instruct/snapshots/a09a35458c702b33eeacc393d103063234e8bc28
+[Step1] Prefetched tokenizer: vocab size 151665
+[Step1] Starting post-pretraining (LoRA/QLoRA)
+[Step1] Selected stage: qwen
+[Step1] Disk check for /scratch-shared/tc1proj005: need 180G, avail 82551G
+[Step1] Cleaning HF cache at /scratch-shared/tc1proj005
+[Step1] Skipping cache clean to avoid wiping SCRATCH_BASE root
+[Step1] Qwen/Qwen2.5-7B-Instruct QLoRA: starting
+[Step1] Qwen args: --base-model Qwen/Qwen2.5-7B-Instruct --output-dir /scratch-shared/tc1proj005/post_pretrain_qwen2-72b_lora --data-path data/ultrafeedback.csv --tokenizer-path Qwen/Qwen2.5-7B-Instruct --bf16 --qlora --epochs 1 --lr 1e-5 --max-length 1024 --r 64 --lora-alpha 128 --per-device-batch 1 --grad-accum 16 --subset-size 0 --max-steps 100 --grad-checkpoint
+[DEBUG] Trainable params: 161,491,456 / 3,969,477,120 (4.0683%)
+[INFO] subset_size=0 -> ignoring and using full dataset of 157675 examples
+{'loss': 48.087, 'grad_norm': 2398.1669921875, 'learning_rate': 8.1e-06, 'epoch': 0.0}
+{'loss': 43.3908, 'grad_norm': 1722.2755126953125, 'learning_rate': 6.1e-06, 'epoch': 0.0}
+{'loss': 39.8548, 'grad_norm': 1637.2821044921875, 'learning_rate': 4.1e-06, 'epoch': 0.0}
+{'loss': 35.7549, 'grad_norm': 1473.3309326171875, 'learning_rate': 2.1000000000000002e-06, 'epoch': 0.0}
+{'loss': 33.7789, 'grad_norm': 1693.0772705078125, 'learning_rate': 1.0000000000000001e-07, 'epoch': 0.01}
+{'train_runtime': 16292.8413, 'train_samples_per_second': 0.098, 'train_steps_per_second': 0.006, 'train_loss': 40.17328857421875, 'epoch': 0.01}
+[INFO] Wrote training_summary.json
+[Merge] Saving merged model to /scratch-shared/tc1proj005/post_pretrain_qwen2-72b_merged
+[Step1] Stage 'qwen' completed
