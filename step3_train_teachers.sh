@@ -314,31 +314,28 @@ mkdir -p model_save || true  # ensure local dir exists for symlink compatibility
 LORA_R=${TEACHER_LORA_R:-16}
 LORA_ALPHA=${TEACHER_LORA_ALPHA:-32}
 MAXLEN=${TEACHER_MAXLEN:-512}
-GRAD_ACCUM=${TEACHER_GRAD_ACCUM:-8}
-BS=${TEACHER_PER_DEVICE_BS:-1}
+# For fastest training: use minimal accumulation and a larger per-device batch by default.
+# Override with TEACHER_GRAD_ACCUM / TEACHER_PER_DEVICE_BS if you hit OOM on your GPU.
+GRAD_ACCUM=${TEACHER_GRAD_ACCUM:-1}
+BS=${TEACHER_PER_DEVICE_BS:-16}
 EPOCHS=${TEACHER_EPOCHS:-1}
 LR=${TEACHER_LR:-1e-5}
 SUBSET=${TEACHER_SUBSET_SIZE:--1}
-MAX_STEPS=${TEACHER_MAX_STEPS:-300}
-TIME_BUDGET_HOURS=${TEACHER_TIME_BUDGET_HOURS:-6}
+# Default to epoch-driven training: no max-steps unless explicitly provided
+MAX_STEPS=${TEACHER_MAX_STEPS:--1}
+# Time budget auto-capping disabled by default; set >0 to enable custom logic externally
+TIME_BUDGET_HOURS=${TEACHER_TIME_BUDGET_HOURS:--1}
 
-# Auto shrink MAX_STEPS if naive estimate exceeds time budget.
-# Rough per-step seconds heuristic (smaller post-pretrained base, QLoRA): 45s; adjust via TEACHER_EST_STEP_SEC
-EST_STEP_SEC=${TEACHER_EST_STEP_SEC:-45}
-TOTAL_FOLDS=5
-MODELS_PER_FOLD=2
-if [ -z "${TEACHER_MAX_STEPS:-}" ] || [ "${TEACHER_MAX_STEPS}" = "" ]; then
-  TEACHER_MAX_STEPS=${MAX_STEPS}
+# Epoch-first training: we do not auto-cap by time unless explicitly configured.
+# If you want time-based capping, export TEACHER_MAX_STEPS>0 and/or TEACHER_TIME_BUDGET_HOURS>0.
+
+# Build optional extra args for lora_train.py based on user overrides
+COMMON_EXTRA_ARGS=()
+if [ -n "${MAX_STEPS}" ] 2>/dev/null && [ "${MAX_STEPS}" -gt 0 ] 2>/dev/null; then
+  COMMON_EXTRA_ARGS+=(--max-steps "${MAX_STEPS}")
 fi
-RAW_PROJECTED_SEC=$(( MAX_STEPS * EST_STEP_SEC * TOTAL_FOLDS * MODELS_PER_FOLD ))
-BUDGET_SEC=$(( TIME_BUDGET_HOURS * 3600 ))
-if [ ${RAW_PROJECTED_SEC} -gt ${BUDGET_SEC} ]; then
-  # distribute budget evenly
-  PER_MODEL_ALLOWED=$(( BUDGET_SEC / (TOTAL_FOLDS * MODELS_PER_FOLD) ))
-  NEW_MAX=$(( PER_MODEL_ALLOWED / EST_STEP_SEC ))
-  if [ ${NEW_MAX} -lt 10 ]; then NEW_MAX=10; fi
-  echo "[Step3][AutoCap] Reducing MAX_STEPS from ${MAX_STEPS} to ${NEW_MAX} to fit ${TIME_BUDGET_HOURS}h budget (est step ${EST_STEP_SEC}s)" >&2
-  MAX_STEPS=${NEW_MAX}
+if [ -n "${SUBSET}" ] 2>/dev/null && [ "${SUBSET}" -gt 0 ] 2>/dev/null; then
+  COMMON_EXTRA_ARGS+=(--subset-size "${SUBSET}")
 fi
 
 ###############################################
@@ -447,20 +444,13 @@ for FOLD in $FOLD_LIST; do
         --per-device-batch "${BS}" \
         --epochs "${EPOCHS}" \
         --lr "${LR}" \
-        --max-steps "${MAX_STEPS}" || { echo "[Step3][Error] LLaMA fold ${FOLD} failed"; exit 11; }
+        "${COMMON_EXTRA_ARGS[@]}" || { echo "[Step3][Error] LLaMA fold ${FOLD} failed"; exit 11; }
     fi
     python lora_merge.py \
       --base-model "${LLAMA_BASE_DIR}" \
       --lora-dir "${LL_OUT_LORA}" \
       --out-dir "${LL_OUT_MERGED}" || { echo "[Step3][Error] LLaMA merge fold ${FOLD} failed"; exit 12; }
-    if [ "$DISABLE_SYMLINKS" != "1" ]; then
-      ln -sfn "${LL_OUT_MERGED}" "model_save/llama_fold_${FOLD}" || echo "[Step3][Warn] Could not create symlink model_save/llama_fold_${FOLD}"
-      ln -sfn "${LL_OUT_LORA}" "model_save/llama_fold_${FOLD}_lora" || true
-      if [ "$EXPOSE_ROOT" = "1" ]; then
-        ln -sfn "${LL_OUT_MERGED}" "llama_fold_${FOLD}" || echo "[Step3][Warn] Could not create root symlink llama_fold_${FOLD}"
-        ln -sfn "${LL_OUT_LORA}" "llama_fold_${FOLD}_lora" || echo "[Step3][Warn] Could not create root symlink llama_fold_${FOLD}_lora"
-      fi
-    fi
+    # Symlink creation removed as requested
     check_weight_dir "${LL_OUT_MERGED}" "LLaMA merged fold ${FOLD}"
     mirror_dir_if_requested "${LL_OUT_MERGED}" "llama_fold_${FOLD}"
     mirror_dir_if_requested "${LL_OUT_LORA}" "llama_fold_${FOLD}_lora"
@@ -532,20 +522,13 @@ PY
         --per-device-batch "${BS}" \
         --epochs "${EPOCHS}" \
         --lr "${LR}" \
-        --max-steps "${MAX_STEPS}" || { echo "[Step3][Error] Qwen fold ${FOLD} failed"; exit 21; }
+        "${COMMON_EXTRA_ARGS[@]}" || { echo "[Step3][Error] Qwen fold ${FOLD} failed"; exit 21; }
     fi
     python lora_merge.py \
       --base-model "${QWEN_BASE_DIR}" \
       --lora-dir "${QW_OUT_LORA}" \
       --out-dir "${QW_OUT_MERGED}" || { echo "[Step3][Error] Qwen merge fold ${FOLD} failed"; exit 22; }
-    if [ "$DISABLE_SYMLINKS" != "1" ]; then
-      ln -sfn "${QW_OUT_MERGED}" "model_save/qwen_fold_${FOLD}" || echo "[Step3][Warn] Could not create symlink model_save/qwen_fold_${FOLD}"
-      ln -sfn "${QW_OUT_LORA}" "model_save/qwen_fold_${FOLD}_lora" || true
-      if [ "$EXPOSE_ROOT" = "1" ]; then
-        ln -sfn "${QW_OUT_MERGED}" "qwen_fold_${FOLD}" || echo "[Step3][Warn] Could not create root symlink qwen_fold_${FOLD}"
-        ln -sfn "${QW_OUT_LORA}" "qwen_fold_${FOLD}_lora" || echo "[Step3][Warn] Could not create root symlink qwen_fold_${FOLD}_lora"
-      fi
-    fi
+    # Symlink creation removed as requested
     check_weight_dir "${QW_OUT_MERGED}" "Qwen merged fold ${FOLD}"
     mirror_dir_if_requested "${QW_OUT_MERGED}" "qwen_fold_${FOLD}"
     mirror_dir_if_requested "${QW_OUT_LORA}" "qwen_fold_${FOLD}_lora"

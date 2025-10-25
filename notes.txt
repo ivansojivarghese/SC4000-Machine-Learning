@@ -42,84 +42,16 @@ sbatch step2_make_folds.sh
 ---
 
 Step 3:
-export TEACHER_LORA_R=16
-export TEACHER_LORA_ALPHA=32
-export TEACHER_MAXLEN=512
-export TEACHER_GRAD_ACCUM=8
-export TEACHER_MAX_STEPS=300   # or adjust
-sbatch step3_train_teachers.sh
-OR
-export TEACHER_TIME_BUDGET_HOURS=6
-export TEACHER_EST_STEP_SEC=55   # if real step slower, it will lower steps further
-export TEACHER_MAX_STEPS=80      # upper bound before auto-cap
-export HF_TOKEN=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
-# (Optionally specify local bases if you know their dirs)
-# export LLAMA_FT_BASE=/scratch-shared/tc1proj005/post_pretrain_llama3-8b_merged
-# export QWEN_FT_BASE=/scratch-shared/tc1proj005/post_pretrain_qwen2-14b_merged
-sbatch step3_train_teachers.sh
-OR
-----
-export HF_TOKEN=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
-sbatch --export=ALL,TEACHER_FOLDS=0,TEACHER_MAX_STEPS=30,LLAMA_FT_BASE=/scratch-shared/tc1proj005/post_pretrain_llama3-8b_merged,QWEN_FT_BASE=/scratch-shared/tc1proj005/post_pretrain_qwen2-72b_merged step3_train_teachers.sh
-OR
-TEACHER_FOLDS=0 \
-LLAMA_FT_BASE=/scratch-shared/tc1proj005/post_pretrain_llama3-8b_merged \
-QWEN_FT_BASE=/scratch-shared/tc1proj005/post_pretrain_qwen2-72b_merged \
-TEACHER_DISABLE_SYMLINKS=1 TEACHER_REQUIRE_WEIGHTS=1 \
-TEACHER_SKIP_TRAIN=0 \
-sbatch step3_train_teachers.sh
+
+TEACHER_SUBSET_SIZE=20000 TEACHER_MAX_STEPS=400 TEACHER_FOLDS="0" SKIP_QWEN=1 sbatch step3_train_teachers.sh
+TEACHER_SUBSET_SIZE=20000 TEACHER_MAX_STEPS=400 TEACHER_FOLDS="0" SKIP_LLAMA=1 sbatch step3_train_teachers.sh
 
 
-export HF_TOKEN=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
-sbatch --export=ALL,TEACHER_FOLDS=1,TEACHER_MAX_STEPS=30,LLAMA_FT_BASE=/scratch-shared/tc1proj005/post_pretrain_llama3-8b_merged,QWEN_FT_BASE=/scratch-shared/tc1proj005/post_pretrain_qwen2-72b_merged step3_train_teachers.sh
-OR
-TEACHER_FOLDS=1 \
-LLAMA_FT_BASE=/scratch-shared/tc1proj005/post_pretrain_llama3-8b_merged \
-QWEN_FT_BASE=/scratch-shared/tc1proj005/post_pretrain_qwen2-72b_merged \
-TEACHER_DISABLE_SYMLINKS=1 TEACHER_REQUIRE_WEIGHTS=1 \
-TEACHER_SKIP_TRAIN=0 \
-sbatch step3_train_teachers.sh
 
-
-export HF_TOKEN=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
-sbatch --export=ALL,TEACHER_FOLDS=2,TEACHER_MAX_STEPS=30,LLAMA_FT_BASE=/scratch-shared/tc1proj005/post_pretrain_llama3-8b_merged,QWEN_FT_BASE=/scratch-shared/tc1proj005/post_pretrain_qwen2-72b_merged step3_train_teachers.sh
-OR
-TEACHER_FOLDS=2 \
-LLAMA_FT_BASE=/scratch-shared/tc1proj005/post_pretrain_llama3-8b_merged \
-QWEN_FT_BASE=/scratch-shared/tc1proj005/post_pretrain_qwen2-72b_merged \
-TEACHER_DISABLE_SYMLINKS=1 TEACHER_REQUIRE_WEIGHTS=1 \
-TEACHER_SKIP_TRAIN=0 \
-sbatch step3_train_teachers.sh
-
-
-export HF_TOKEN=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
-sbatch --export=ALL,TEACHER_FOLDS=3,TEACHER_MAX_STEPS=30,LLAMA_FT_BASE=/scratch-shared/tc1proj005/post_pretrain_llama3-8b_merged,QWEN_FT_BASE=/scratch-shared/tc1proj005/post_pretrain_qwen2-72b_merged step3_train_teachers.sh
-OR
-TEACHER_FOLDS=3 \
-LLAMA_FT_BASE=/scratch-shared/tc1proj005/post_pretrain_llama3-8b_merged \
-QWEN_FT_BASE=/scratch-shared/tc1proj005/post_pretrain_qwen2-72b_merged \
-TEACHER_DISABLE_SYMLINKS=1 TEACHER_REQUIRE_WEIGHTS=1 \
-TEACHER_SKIP_TRAIN=0 \
-sbatch step3_train_teachers.sh
-
-
-export HF_TOKEN=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
-sbatch --export=ALL,TEACHER_FOLDS=4,TEACHER_MAX_STEPS=30,LLAMA_FT_BASE=/scratch-shared/tc1proj005/post_pretrain_llama3-8b_merged,QWEN_FT_BASE=/scratch-shared/tc1proj005/post_pretrain_qwen2-72b_merged step3_train_teachers.sh
-OR
-TEACHER_FOLDS=4 \
-LLAMA_FT_BASE=/scratch-shared/tc1proj005/post_pretrain_llama3-8b_merged \
-QWEN_FT_BASE=/scratch-shared/tc1proj005/post_pretrain_qwen2-72b_merged \
-TEACHER_DISABLE_SYMLINKS=1 TEACHER_REQUIRE_WEIGHTS=1 \
-TEACHER_SKIP_TRAIN=0 \
-sbatch step3_train_teachers.sh
-
--
-
-TEACHER_SKIP_TRAIN=1 sbatch step3_train_teachers.sh
-
-
+---
 
 Step 4:
+
 INFER_SAVE_LASTTOK=0 INFER_FORCE_REGEN=1 sbatch step4_infer_teacher_logits.sh
 OR
 INFER_PREFER_LORA=1 INFER_LLAMA_SUBSET=15000-20000 INFER_QWEN_SUBSET=9000-10000 INFER_SUBSET_SEED=42 sbatch step4_infer_teacher_logits.sh

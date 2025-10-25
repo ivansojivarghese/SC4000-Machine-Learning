@@ -4,6 +4,7 @@ from typing import Optional
 
 import torch
 from transformers import AutoTokenizer, AutoModelForSequenceClassification, TrainingArguments, Trainer, TrainerCallback
+from transformers import DataCollatorWithPadding
 from datasets import load_dataset
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 from transformers import BitsAndBytesConfig
@@ -54,7 +55,13 @@ def train_lora(
                 f"pass --tokenizer-path pointing to a compatible model/repo with tokenizer files (e.g., meta-llama/Meta-Llama-3-70B)."
             ) from e_slow
     if tokenizer.pad_token is None:
+        # Ensure a valid pad token; for decoder-only LLMs we usually reuse eos as pad
         tokenizer.pad_token = tokenizer.eos_token
+    # Right padding is generally safer for decoder-only models when doing classification
+    try:
+        tokenizer.padding_side = "right"
+    except Exception:
+        pass
 
     bnb_config = None
     if qlora:
@@ -87,6 +94,23 @@ def train_lora(
         # Only use 8-bit when not already doing 4bit QLoRA
         model_kwargs["load_in_8bit"] = True
     model = AutoModelForSequenceClassification.from_pretrained(base_model, **model_kwargs)
+    # Align pad/eos/bos ids between tokenizer and model to avoid batch>1 errors
+    try:
+        if getattr(model.config, 'pad_token_id', None) is None or model.config.pad_token_id == -1:
+            model.config.pad_token_id = tokenizer.pad_token_id
+        # Keep eos/bos consistent if available
+        if getattr(model.config, 'eos_token_id', None) is None:
+            model.config.eos_token_id = tokenizer.eos_token_id
+        if getattr(model.config, 'bos_token_id', None) is None and hasattr(tokenizer, 'bos_token_id'):
+            model.config.bos_token_id = tokenizer.bos_token_id
+        # Generation config if present
+        if hasattr(model, 'generation_config'):
+            if getattr(model.generation_config, 'pad_token_id', None) is None:
+                model.generation_config.pad_token_id = tokenizer.pad_token_id
+            if getattr(model.generation_config, 'eos_token_id', None) is None:
+                model.generation_config.eos_token_id = tokenizer.eos_token_id
+    except Exception as _align_e:
+        print(f"[WARN] Could not fully align special token ids: {_align_e}")
 
     # Prepare model for k-bit training in both 4-bit (QLoRA) and 8-bit LoRA scenarios
     if qlora or load_8bit:
@@ -155,7 +179,7 @@ def train_lora(
             print(f"[INFO] subset_size={subset_size} -> ignoring and using full dataset of {len(ds['train'])} examples")
 
     # For ultrafeedback_mini.csv: for each row, create two examples (chosen=label 0, rejected=label 1)
-
+    """
     def build_examples_from_row(row):
         prompt = row.get("prompt") or row.get("question") or ""
         chosen = row.get("chosen") or ""
@@ -194,6 +218,157 @@ def train_lora(
                 encoded["labels"] = 1  # rejected is B (label 1)
                 examples.append(encoded)
         return examples
+    """
+
+    import ast
+    import unicodedata
+
+    def _coerce_text(x):
+        """
+        Ensure x is a clean Python str without invalid surrogate code points.
+        - If bytes, decode utf-8 with errors='ignore'.
+        - If not str, cast to str.
+        - Strip surrounding whitespace.
+        - Remove any unencodable characters by round-tripping through utf-8.
+        """
+        if isinstance(x, bytes):
+            try:
+                x = x.decode('utf-8', errors='ignore')
+            except Exception:
+                x = str(x)
+        elif not isinstance(x, str):
+            x = str(x)
+        # Normalize to NFC to avoid odd surrogate combos
+        try:
+            x = unicodedata.normalize('NFC', x)
+        except Exception:
+            pass
+        # Drop invalid surrogates
+        try:
+            x = x.encode('utf-8', errors='ignore').decode('utf-8', errors='ignore')
+        except Exception:
+            pass
+        return x.strip()
+
+    def build_examples_from_row(row):
+        prompts = row.get("prompt")
+        responses_a = row.get("response_a")
+        responses_b = row.get("response_b")
+
+        # Convert stringified lists to real lists
+        for name, val in [("prompt", prompts), ("response_a", responses_a), ("response_b", responses_b)]:
+            if isinstance(val, str):
+                try:
+                    val_parsed = ast.literal_eval(val)
+                    if isinstance(val_parsed, list):
+                        if name == "prompt": prompts = val_parsed
+                        elif name == "response_a": responses_a = val_parsed
+                        else: responses_b = val_parsed
+                    else:
+                        if name == "prompt": prompts = [str(val)]
+                        elif name == "response_a": responses_a = [str(val)]
+                        else: responses_b = [str(val)]
+                except Exception:
+                    # just wrap in list if not parseable
+                    if name == "prompt": prompts = [str(val)]
+                    elif name == "response_a": responses_a = [str(val)]
+                    else: responses_b = [str(val)]
+        
+        # Ensure lists
+        if not isinstance(prompts, list): prompts = [str(prompts)]
+        if not isinstance(responses_a, list): responses_a = [str(responses_a)]
+        if not isinstance(responses_b, list): responses_b = [str(responses_b)]
+
+        winner_a = row.get("winner_model_a", 0)
+        winner_b = row.get("winner_model_b", 0)
+        winner_tie = row.get("winner_tie", 0)
+
+        # Fallback: Kaggle schemas
+        if not (winner_a or winner_b or winner_tie):
+            w = row.get("winner")
+            # winner can be int label (0/1/2) or string 'A'/'B'/'tie'
+            if w is not None and w != "":
+                try:
+                    wi = int(float(w))
+                    if wi in (0,1,2):
+                        winner_a = 1 if wi == 0 else 0
+                        winner_b = 1 if wi == 1 else 0
+                        winner_tie = 1 if wi == 2 else 0
+                except Exception:
+                    s = str(w).strip().lower()
+                    if s in ("a","model_a"): winner_a = 1
+                    elif s in ("b","model_b"): winner_b = 1
+                    elif s.startswith("tie"): winner_tie = 1
+            # One-hot ints
+            if not (winner_a or winner_b or winner_tie) and all(k in row for k in ("winner_model_a","winner_model_b","winner_tie")):
+                try:
+                    a_i = int(float(row.get("winner_model_a") or 0))
+                    b_i = int(float(row.get("winner_model_b") or 0))
+                    t_i = int(float(row.get("winner_tie") or 0))
+                    # pick argmax
+                    mx = max([(a_i, 'a'), (b_i, 'b'), (t_i, 't')])
+                    winner_a = 1 if mx[1]=='a' else 0
+                    winner_b = 1 if mx[1]=='b' else 0
+                    winner_tie = 1 if mx[1]=='t' else 0
+                except Exception:
+                    pass
+            # Probability columns
+            if not (winner_a or winner_b or winner_tie) and all(k in row for k in ("winner_model_a_prob","winner_model_b_prob","winner_tie_prob")):
+                try:
+                    a_p = float(row.get("winner_model_a_prob") or 0.0)
+                    b_p = float(row.get("winner_model_b_prob") or 0.0)
+                    t_p = float(row.get("winner_tie_prob") or 0.0)
+                    if a_p >= b_p and a_p >= t_p: winner_a = 1
+                    elif b_p >= a_p and b_p >= t_p: winner_b = 1
+                    else: winner_tie = 1
+                except Exception:
+                    pass
+
+        examples = []
+
+        for i, prompt in enumerate(prompts):
+            if i >= len(responses_a) or i >= len(responses_b):
+                break
+
+            # Pick chosen/rejected based on winner columns
+            if winner_tie:
+                chosen, rejected, label = responses_a[i], responses_b[i], 2
+            elif winner_a:
+                chosen, rejected, label = responses_a[i], responses_b[i], 0
+            elif winner_b:
+                chosen, rejected, label = responses_b[i], responses_a[i], 1
+            else:
+                continue
+
+            # Guarantee clean strings
+            prompt_s = _coerce_text(prompt)
+            chosen_s = _coerce_text(chosen)
+
+            # For 33k-style rows we use prompt + chosen; for Kaggle rows it still applies
+            text = f"{prompt_s}\n{chosen_s}" if prompt_s else chosen_s
+
+            try:
+                encoded = tokenizer(
+                    text,
+                    truncation=True,
+                    max_length=max_length,
+                    padding="max_length",
+                )
+            except Exception as e:
+                # Avoid UnicodeEncodeError when printing problematic text
+                try:
+                    sample = repr(text)
+                except Exception:
+                    sample = f"<unprintable type {type(text)}>"
+                print("❌ Tokenization error:", e)
+                print("Offending text repr (first 500):", sample[:500])
+                continue
+
+            encoded["labels"] = label
+            examples.append(encoded)
+
+        return examples
+
 
     # Flatten all examples from all rows
     all_examples = []
@@ -251,7 +426,14 @@ def train_lora(
             }
 
     timing_cb = StepTimingCallback()
-    trainer = Trainer(model=model, args=args, train_dataset=tokenized, callbacks=[timing_cb])
+    data_collator = DataCollatorWithPadding(tokenizer=tokenizer, pad_to_multiple_of=8 if (bf16 or not bf16) else None)
+    trainer = Trainer(
+        model=model,
+        args=args,
+        train_dataset=tokenized,
+        data_collator=data_collator,
+        callbacks=[timing_cb]
+    )
     import time, json
     t0 = time.time()
     trainer.train()
