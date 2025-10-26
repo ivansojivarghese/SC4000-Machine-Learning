@@ -1,9 +1,0 @@
-/home/UG/ivansoji001/.local/lib/python3.9/site-packages/auto_gptq/nn_modules/triton_utils/kernels.py:411: FutureWarning: `torch.cuda.amp.custom_fwd(args...)` is deprecated. Please use `torch.amp.custom_fwd(args..., device_type='cuda')` instead.
-  def forward(ctx, input, qweight, scales, qzeros, g_idx, bits, maxq):
-/home/UG/ivansoji001/.local/lib/python3.9/site-packages/auto_gptq/nn_modules/triton_utils/kernels.py:419: FutureWarning: `torch.cuda.amp.custom_bwd(args...)` is deprecated. Please use `torch.amp.custom_bwd(args..., device_type='cuda')` instead.
-  def backward(ctx, grad_output):
-/home/UG/ivansoji001/.local/lib/python3.9/site-packages/auto_gptq/nn_modules/triton_utils/kernels.py:461: FutureWarning: `torch.cuda.amp.custom_fwd(args...)` is deprecated. Please use `torch.amp.custom_fwd(args..., device_type='cuda')` instead.
-  @custom_fwd(cast_inputs=torch.float16)
-CUDA extension not installed.
-CUDA extension not installed.
-Loading checkpoint shards:   0%|          | 0/8 [00:00<?, ?it/s]Loading checkpoint shards:  12%|█▎        | 1/8 [00:17<02:00, 17.18s/it]Loading checkpoint shards:  25%|██▌       | 2/8 [00:37<01:54, 19.16s/it]Loading checkpoint shards:  38%|███▊      | 3/8 [00:59<01:40, 20.19s/it]Loading checkpoint shards:  50%|█████     | 4/8 [01:19<01:21, 20.45s/it]Loading checkpoint shards:  62%|██████▎   | 5/8 [01:44<01:05, 21.78s/it]Loading checkpoint shards:  75%|███████▌  | 6/8 [02:05<00:43, 21.79s/it]Loading checkpoint shards:  88%|████████▊ | 7/8 [02:29<00:22, 22.27s/it]Loading checkpoint shards: 100%|██████████| 8/8 [02:40<00:00, 18.80s/it]Loading checkpoint shards: 100%|██████████| 8/8 [02:40<00:00, 20.07s/it]

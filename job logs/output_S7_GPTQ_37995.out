@@ -1,2 +1,0 @@
-[quantize_gptq] AutoGPTQ unsupported or failed: gemma2 isn't supported yet.. Falling back to BitsAndBytes int8 runtime.
-[Step7] Done
