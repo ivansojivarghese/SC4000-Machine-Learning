@@ -1,0 +1,23 @@
+[Step5] Distilling fold 4 using LLaMA-only OOF probs
+{'loss': 11.8692, 'grad_norm': 59.60523223876953, 'learning_rate': 1.2140425531914893e-05, 'epoch': 0.6}
+{'loss': 14.9868, 'grad_norm': 61.746910095214844, 'learning_rate': 1.150212765957447e-05, 'epoch': 0.62}
+{'loss': 11.7553, 'grad_norm': 127.80755615234375, 'learning_rate': 1.0863829787234043e-05, 'epoch': 0.64}
+{'loss': 12.4943, 'grad_norm': 63.6731071472168, 'learning_rate': 1.0225531914893617e-05, 'epoch': 0.66}
+{'loss': 14.7088, 'grad_norm': 23.813615798950195, 'learning_rate': 9.587234042553192e-06, 'epoch': 0.68}
+{'loss': 11.7312, 'grad_norm': 35.28199005126953, 'learning_rate': 8.948936170212767e-06, 'epoch': 0.7}
+{'loss': 11.7124, 'grad_norm': 102.0994873046875, 'learning_rate': 8.31063829787234e-06, 'epoch': 0.72}
+{'loss': 12.8476, 'grad_norm': 79.13841247558594, 'learning_rate': 7.672340425531914e-06, 'epoch': 0.73}
+{'loss': 13.2589, 'grad_norm': 52.734195709228516, 'learning_rate': 7.034042553191489e-06, 'epoch': 0.75}
+{'loss': 11.7911, 'grad_norm': 201.62159729003906, 'learning_rate': 6.395744680851064e-06, 'epoch': 0.77}
+{'loss': 12.4731, 'grad_norm': 55.33562469482422, 'learning_rate': 5.7574468085106386e-06, 'epoch': 0.79}
+{'loss': 12.4478, 'grad_norm': 95.93045806884766, 'learning_rate': 5.1191489361702124e-06, 'epoch': 0.81}
+{'loss': 13.5115, 'grad_norm': 69.21160125732422, 'learning_rate': 4.480851063829787e-06, 'epoch': 0.83}
+{'loss': 12.9236, 'grad_norm': 92.78917694091797, 'learning_rate': 3.842553191489362e-06, 'epoch': 0.85}
+{'loss': 11.7559, 'grad_norm': 76.92516326904297, 'learning_rate': 3.204255319148936e-06, 'epoch': 0.87}
+{'loss': 13.2939, 'grad_norm': 49.11098861694336, 'learning_rate': 2.565957446808511e-06, 'epoch': 0.89}
+{'loss': 13.1362, 'grad_norm': 104.01893615722656, 'learning_rate': 1.927659574468085e-06, 'epoch': 0.91}
+{'loss': 13.1452, 'grad_norm': 184.60047912597656, 'learning_rate': 1.2893617021276596e-06, 'epoch': 0.93}
+{'loss': 12.8933, 'grad_norm': 39.067989349365234, 'learning_rate': 6.510638297872341e-07, 'epoch': 0.95}
+{'loss': 12.5356, 'grad_norm': 90.39295196533203, 'learning_rate': 1.2765957446808511e-08, 'epoch': 0.97}
+{'train_runtime': 11744.7336, 'train_samples_per_second': 3.406, 'train_steps_per_second': 0.213, 'train_loss': 5.10542998046875, 'epoch': 0.97}
+{'eval': {'eval_loss': 0.7885165810585022, 'eval_log_loss': 1.0494458200915004, 'eval_accuracy': 0.46401391606871056, 'eval_runtime': 1047.4051, 'eval_samples_per_second': 4.391, 'eval_steps_per_second': 4.391, 'epoch': 0.9665804799072083}}

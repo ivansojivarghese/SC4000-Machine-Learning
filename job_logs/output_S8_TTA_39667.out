@@ -1,0 +1,7 @@
+[Info] Trying BNB int8 load from: model_save/final_merged_model
+
+[INFO] Applying tie prediction correction...
+  Before: mean_tie=0.4506, mean_a=0.1365, mean_b=0.4129
+  After:  mean_tie=0.2704, mean_a=0.2086, mean_b=0.5210
+[INFO] Tie correction applied successfully.
+[Step8] Wrote ./sub/final_submission.csv

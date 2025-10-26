@@ -1,0 +1,5 @@
+[Step5] Distilling fold 4 using LLaMA-only OOF probs
+[Step5] Applying safer hyperparameters for fold 4
+{'train_runtime': 21.9243, 'train_samples_per_second': 4232.743, 'train_steps_per_second': 264.546, 'train_loss': 0.00252317810979224, 'epoch': 2.24}
+{'eval': {'eval_loss': 0.7456324100494385, 'eval_log_loss': 1.1414238600818256, 'eval_accuracy': 0.46205696890628395, 'eval_runtime': 962.4167, 'eval_samples_per_second': 4.779, 'eval_steps_per_second': 4.779, 'epoch': 2.242418384360728}}
+[Step5] Done fold 4 -> model_save/distilled_gemma2-9b_fold_4

@@ -1,0 +1,36 @@
+[Step5] Distilling fold 4 using LLaMA-only OOF probs
+[Step5] Applying safer hyperparameters for fold 4
+[Step5] Resuming from checkpoint: none
+{'loss': 16.8235, 'grad_norm': 212.6144561767578, 'learning_rate': 1.633333333333333e-05, 'epoch': 0.02}
+{'loss': 15.8863, 'grad_norm': 168.458984375, 'learning_rate': 2.9808510638297874e-05, 'epoch': 0.04}
+{'loss': 14.4575, 'grad_norm': 152.97628784179688, 'learning_rate': 2.874468085106383e-05, 'epoch': 0.06}
+{'loss': 14.285, 'grad_norm': 160.93502807617188, 'learning_rate': 2.768085106382979e-05, 'epoch': 0.08}
+{'loss': 13.0396, 'grad_norm': 147.911865234375, 'learning_rate': 2.6617021276595746e-05, 'epoch': 0.1}
+{'loss': 12.2507, 'grad_norm': 79.05541229248047, 'learning_rate': 2.55531914893617e-05, 'epoch': 0.12}
+{'loss': 12.8241, 'grad_norm': 83.7010498046875, 'learning_rate': 2.448936170212766e-05, 'epoch': 0.14}
+{'loss': 11.6465, 'grad_norm': 148.34010314941406, 'learning_rate': 2.3425531914893618e-05, 'epoch': 0.15}
+{'loss': 11.9446, 'grad_norm': 36.68046951293945, 'learning_rate': 2.2361702127659576e-05, 'epoch': 0.17}
+{'loss': 12.1509, 'grad_norm': 61.55965805053711, 'learning_rate': 2.129787234042553e-05, 'epoch': 0.19}
+{'loss': 11.2164, 'grad_norm': 207.9579315185547, 'learning_rate': 2.023404255319149e-05, 'epoch': 0.21}
+{'loss': 12.1052, 'grad_norm': 70.19581604003906, 'learning_rate': 1.9170212765957448e-05, 'epoch': 0.23}
+{'loss': 12.4222, 'grad_norm': 122.91619110107422, 'learning_rate': 1.8106382978723407e-05, 'epoch': 0.25}
+{'loss': 12.0855, 'grad_norm': 145.56539916992188, 'learning_rate': 1.704255319148936e-05, 'epoch': 0.27}
+{'loss': 11.8375, 'grad_norm': 106.8071060180664, 'learning_rate': 1.597872340425532e-05, 'epoch': 0.29}
+{'loss': 10.8655, 'grad_norm': 37.613250732421875, 'learning_rate': 1.4914893617021277e-05, 'epoch': 0.31}
+{'loss': 11.6138, 'grad_norm': 104.49507141113281, 'learning_rate': 1.3851063829787235e-05, 'epoch': 0.33}
+{'loss': 12.3954, 'grad_norm': 53.48937225341797, 'learning_rate': 1.2787234042553192e-05, 'epoch': 0.35}
+{'loss': 11.4331, 'grad_norm': 117.92984008789062, 'learning_rate': 1.172340425531915e-05, 'epoch': 0.37}
+{'loss': 11.7417, 'grad_norm': 120.54603576660156, 'learning_rate': 1.0659574468085107e-05, 'epoch': 0.39}
+{'loss': 11.29, 'grad_norm': 70.68651580810547, 'learning_rate': 9.595744680851065e-06, 'epoch': 0.41}
+{'loss': 11.2019, 'grad_norm': 89.50243377685547, 'learning_rate': 8.531914893617022e-06, 'epoch': 0.43}
+{'loss': 13.0038, 'grad_norm': 55.08694839477539, 'learning_rate': 7.468085106382979e-06, 'epoch': 0.44}
+{'loss': 12.1096, 'grad_norm': 60.82136154174805, 'learning_rate': 6.404255319148936e-06, 'epoch': 0.46}
+{'loss': 12.9523, 'grad_norm': 79.78457641601562, 'learning_rate': 5.340425531914894e-06, 'epoch': 0.48}
+{'loss': 12.508, 'grad_norm': 49.62181854248047, 'learning_rate': 4.2765957446808515e-06, 'epoch': 0.5}
+{'loss': 11.3669, 'grad_norm': 48.22127914428711, 'learning_rate': 3.2127659574468086e-06, 'epoch': 0.52}
+{'loss': 11.0783, 'grad_norm': 174.24465942382812, 'learning_rate': 2.148936170212766e-06, 'epoch': 0.54}
+{'loss': 11.249, 'grad_norm': 37.60111999511719, 'learning_rate': 1.0851063829787233e-06, 'epoch': 0.56}
+{'loss': 10.7392, 'grad_norm': 49.96994400024414, 'learning_rate': 2.1276595744680853e-08, 'epoch': 0.58}
+{'train_runtime': 16897.9767, 'train_samples_per_second': 1.42, 'train_steps_per_second': 0.089, 'train_loss': 12.350798380533854, 'epoch': 0.58}
+{'eval': {'eval_loss': 0.7103835940361023, 'eval_log_loss': 1.0450309648100224, 'eval_accuracy': 0.451619917373342, 'eval_runtime': 965.989, 'eval_samples_per_second': 4.761, 'eval_steps_per_second': 4.761, 'epoch': 0.579948287944325}}
+[Step5] Done fold 4 -> model_save/distilled_gemma2-9b_fold_4

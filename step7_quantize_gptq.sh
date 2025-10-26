@@ -45,3 +45,6 @@ python quantize_gptq_calibrated.py \
   --max-length 1024
 
 echo "[Step7] Done"
+
+# Ensure config.json is present in the quantized model directory
+cp "$MODEL_DIR/config.json" "$OUT_DIR/config.json"

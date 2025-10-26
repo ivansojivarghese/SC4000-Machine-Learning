@@ -1,0 +1,20 @@
+[Info] Loading model from: ./model_save/distilled_gemma2-9b_fold_0
+[Info] Loading classifier head from: model_save/distilled_gemma2-9b_fold_0/classifier_head.pt
+[Info] Loaded 3 test samples
+[Info] Attempting to load with 8-bit quantization...
+[Info] ✅ Loaded with 8-bit quantization
+[Info] ✅ Loaded 3-class classifier head (hidden_size=3584)
+[Info] Running inference...
+
+[Info] ✅ Saved submission to: ./sub/final_submission.csv
+[Info] Sample predictions:
+        id  winner_model_a  winner_model_b  winner_tie
+0   136060        0.164097        0.273979    0.561924
+1   211333        0.276071        0.241735    0.482194
+2  1233961        0.242203        0.371799    0.385998
+
+[Info] Mean probabilities:
+  model_a: 0.2275
+  model_b: 0.2958
+  tie:     0.4767
+[Step8] Wrote ./sub/final_submission.csv

@@ -1,0 +1,63 @@
+[Step3] Resolving SCRATCH_BASE...
+[Step3] Using SCRATCH_BASE=/scratch-shared/tc1proj005
+[Step3] Hugging Face login succeeded (token provided).
+[Step3] Using Kaggle train: data/train.csv | External: data/lmsys-33k-deduplicated.csv
+[Step3][Prep] Starting fold CSV generation...
+[Step3][Prep] Loaded folds json with keys: ['0', '1', '2', '3', '4']
+[Step3][Prep] Filtering to folds ['0'] per TEACHER_FOLDS=0
+[Step3][Prep] Reading Kaggle train CSV...
+[Step3][Prep] Loaded Kaggle train df: (57477, 9)
+[Step3][Prep] Reading external CSV...
+[Step3][Prep] Loaded external df: (21187, 9)
+[Step3][Prep] Writing fold CSVs initially to /scratch-shared/tc1proj005/fold_data (will mirror to data/fold_data)
+[Step3][Prep][Fold 0] Start generation (val idx count=11496)
+[Step3][Prep][Fold 0] Built val set shape=(11496, 9)
+[Step3][Prep][Fold 0] Train subset shape=(45981, 9)
+[Step3][Prep][Fold 0] Combined shape=(67168, 9)
+[Step3][Prep][Fold 0] Composition: kaggle_train_rows=45981 external_rows=21187 expected_total=67168
+[Step3][Prep][Fold 0] Wrote to scratch: /scratch-shared/tc1proj005/fold_data
+[Step3][Prep][Fold 0] Wrote train=196.53MB val=37.07MB | 1/1 | 8.24s
+[Step3][Prep] Completed fold CSV generation in 9.9s
+[Step3][Sync] Copied data/fold_data/fold_0_train.csv -> /scratch-shared/tc1proj005/fold_data/
+[Step3][Sync] Copied data/fold_data/fold_0_val.csv -> /scratch-shared/tc1proj005/fold_data/
+[Step3] LLaMA base: /scratch-shared/tc1proj005/post_pretrain_llama3-8b_merged | tokenizer: meta-llama/Meta-Llama-3.1-8B | skip=1
+[Step3] Qwen base:  /scratch-shared/tc1proj005/post_pretrain_qwen2-72b_merged | tokenizer: Qwen/Qwen2.5-14B | skip=0
+[Step3] Teacher artifacts will be saved under: /scratch-shared/tc1proj005/folds
+[Step3] Selected folds: 0 (from TEACHER_FOLDS='0')
+[Step3] Root-level symlinks for fold models will be created (TEACHER_EXPOSE_ROOT=1).
+[Step3][Skip] LLaMA fold 0 due to SKIP_LLAMA=1
+[Step3] Qwen fold 0 train csv: data/fold_data/fold_0_train.csv
+[WARN] Could not fully align special token ids: 'NoneType' object has no attribute 'pad_token_id'
+[DEBUG] Trainable params: 40,380,928 / 3,848,366,592 (1.0493%)
+[WARN] load_dataset csv auto-infer failed: DatasetGenerationError: An error occurred while generating the dataset
+[WARN] Falling back to pandas coercion mode.
+[INFO] Fallback dataset constructed: 67168 rows | columns: ['id', 'model_a', 'model_b', 'prompt', 'response_a', 'response_b', 'winner_model_a', 'winner_model_b', 'winner_tie']
+[INFO] Subsetting training data: 20000 / 67168 examples (requested 20000)
+{'loss': 2.4706, 'grad_norm': 79.8587875366211, 'learning_rate': 9.525000000000001e-06, 'epoch': 0.01}
+{'loss': 1.0047, 'grad_norm': 35.676551818847656, 'learning_rate': 9.025e-06, 'epoch': 0.03}
+{'loss': 0.5412, 'grad_norm': 14.296268463134766, 'learning_rate': 8.525e-06, 'epoch': 0.04}
+{'loss': 0.2155, 'grad_norm': 29.014347076416016, 'learning_rate': 8.025e-06, 'epoch': 0.05}
+{'loss': 0.2519, 'grad_norm': 2.4565817511756904e-05, 'learning_rate': 7.525e-06, 'epoch': 0.06}
+{'loss': 0.06, 'grad_norm': 1.1597214937210083, 'learning_rate': 7.0250000000000005e-06, 'epoch': 0.08}
+{'loss': 0.0895, 'grad_norm': 7.3241194513684604e-06, 'learning_rate': 6.525e-06, 'epoch': 0.09}
+{'loss': 0.0014, 'grad_norm': 6.297753429862496e-07, 'learning_rate': 6.025000000000001e-06, 'epoch': 0.1}
+{'loss': 0.0298, 'grad_norm': 0.024690847843885422, 'learning_rate': 5.5250000000000005e-06, 'epoch': 0.12}
+{'loss': 0.0006, 'grad_norm': 1.4494622746497043e-07, 'learning_rate': 5.025e-06, 'epoch': 0.13}
+{'loss': 0.0441, 'grad_norm': 1.659316876612138e-05, 'learning_rate': 4.525000000000001e-06, 'epoch': 0.14}
+{'loss': 0.0001, 'grad_norm': 0.0008610956720076501, 'learning_rate': 4.0250000000000004e-06, 'epoch': 0.16}
+{'loss': 0.0431, 'grad_norm': 3.3110469227493056e-11, 'learning_rate': 3.525e-06, 'epoch': 0.17}
+{'loss': 0.0102, 'grad_norm': 0.0002080391423078254, 'learning_rate': 3.0250000000000003e-06, 'epoch': 0.18}
+{'loss': 0.0234, 'grad_norm': 5.415000915527344, 'learning_rate': 2.5250000000000004e-06, 'epoch': 0.19}
+{'loss': 0.0148, 'grad_norm': 0.00011719657777575776, 'learning_rate': 2.025e-06, 'epoch': 0.21}
+{'loss': 0.0059, 'grad_norm': 3.603124336436572e-14, 'learning_rate': 1.525e-06, 'epoch': 0.22}
+{'loss': 0.0052, 'grad_norm': 0.01001930981874466, 'learning_rate': 1.025e-06, 'epoch': 0.23}
+{'loss': 0.0012, 'grad_norm': 9.349915330858494e-07, 'learning_rate': 5.250000000000001e-07, 'epoch': 0.25}
+{'loss': 0.0006, 'grad_norm': 5.294029961078195e-07, 'learning_rate': 2.5000000000000002e-08, 'epoch': 0.26}
+{'train_runtime': 15312.2193, 'train_samples_per_second': 0.418, 'train_steps_per_second': 0.026, 'train_loss': 0.2406846820935607, 'epoch': 0.26}
+[INFO] Wrote training_summary.json
+[Merge] Saving merged model to /scratch-shared/tc1proj005/folds/qwen_fold_0
+[Step3][OK] Sharded safetensors detected in Qwen merged fold 0 (/scratch-shared/tc1proj005/folds/qwen_fold_0)
+[Step3][Info] Qwen merged fold 0 shard count: 15
+[Step3][OK] Weights present (sharded) in Qwen merged fold 0 (/scratch-shared/tc1proj005/folds/qwen_fold_0)
+[Step3][Manifest] Updated /scratch-shared/tc1proj005/folds/manifest.json with qwen fold 0
+[Step3] Done

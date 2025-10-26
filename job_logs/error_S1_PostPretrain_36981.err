@@ -1,0 +1,16 @@
+/home/UG/ivansoji001/.local/lib/python3.9/site-packages/transformers/utils/hub.py:111: FutureWarning: Using `TRANSFORMERS_CACHE` is deprecated and will be removed in v5 of Transformers. Use `HF_HOME` instead.
+  warnings.warn(
+Note: Environment variable`HF_TOKEN` is set and is the current active token independently from the token you've just configured.
+/home/UG/ivansoji001/.local/lib/python3.9/site-packages/transformers/utils/hub.py:111: FutureWarning: Using `TRANSFORMERS_CACHE` is deprecated and will be removed in v5 of Transformers. Use `HF_HOME` instead.
+  warnings.warn(
+Fetching 4 files:   0%|          | 0/4 [00:00<?, ?it/s]/home/UG/ivansoji001/.local/lib/python3.9/site-packages/huggingface_hub/file_download.py:945: FutureWarning: `resume_download` is deprecated and will be removed in version 1.0.0. Downloads always resume when possible. If you want to force a new download, use `force_download=True`.
+  warnings.warn(
+Fetching 4 files: 100%|██████████| 4/4 [00:00<00:00, 228.27it/s]
+[Step1][Skip] POSTPRE_MERGE_ONLY=1 set; skipping Qwen training.
+/home/UG/ivansoji001/.local/lib/python3.9/site-packages/transformers/utils/hub.py:111: FutureWarning: Using `TRANSFORMERS_CACHE` is deprecated and will be removed in v5 of Transformers. Use `HF_HOME` instead.
+  warnings.warn(
+Loading checkpoint shards:   0%|          | 0/8 [00:00<?, ?it/s]Loading checkpoint shards:  12%|█▎        | 1/8 [00:03<00:27,  3.92s/it]Loading checkpoint shards:  25%|██▌       | 2/8 [00:07<00:23,  3.96s/it]Loading checkpoint shards:  38%|███▊      | 3/8 [00:11<00:19,  3.95s/it]Loading checkpoint shards:  50%|█████     | 4/8 [00:14<00:13,  3.50s/it]Loading checkpoint shards:  62%|██████▎   | 5/8 [00:16<00:09,  3.05s/it]Loading checkpoint shards:  75%|███████▌  | 6/8 [00:19<00:05,  2.78s/it]Loading checkpoint shards:  88%|████████▊ | 7/8 [00:21<00:02,  2.61s/it]Loading checkpoint shards: 100%|██████████| 8/8 [00:22<00:00,  2.08s/it]Loading checkpoint shards: 100%|██████████| 8/8 [00:22<00:00,  2.80s/it]
+Some parameters are on the meta device because they were offloaded to the cpu.
+Some parameters are on the meta device because they were offloaded to the cpu.
+`torch_dtype` is deprecated! Use `dtype` instead!
+Loading checkpoint shards:   0%|          | 0/8 [00:00<?, ?it/s]Loading checkpoint shards:  12%|█▎        | 1/8 [00:02<00:17,  2.48s/it]Loading checkpoint shards:  25%|██▌       | 2/8 [00:05<00:15,  2.51s/it]Loading checkpoint shards:  38%|███▊      | 3/8 [00:07<00:12,  2.50s/it]Loading checkpoint shards:  50%|█████     | 4/8 [00:09<00:09,  2.50s/it]Loading checkpoint shards:  62%|██████▎   | 5/8 [00:12<00:07,  2.49s/it]Loading checkpoint shards:  75%|███████▌  | 6/8 [00:14<00:04,  2.49s/it]Loading checkpoint shards:  88%|████████▊ | 7/8 [00:17<00:02,  2.50s/it]Loading checkpoint shards: 100%|██████████| 8/8 [00:18<00:00,  2.05s/it]Loading checkpoint shards: 100%|██████████| 8/8 [00:18<00:00,  2.32s/it]

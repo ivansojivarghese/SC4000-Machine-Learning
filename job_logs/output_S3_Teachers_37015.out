@@ -1,0 +1,37 @@
+[Step3] SCRATCH_BASE candidate: /scratch-shared/tc1proj005
+[Step3] Hugging Face login succeeded (token provided).
+[Step3] Using Kaggle train: data/train.csv | External: data/ultrafeedback.csv
+[Step3][Prep] Fold 0: train (203656, 17) (incl ext 157675) | val (11496, 9)
+[Step3][Prep] Fold 1: train (203656, 17) (incl ext 157675) | val (11496, 9)
+[Step3][Prep] Fold 2: train (203657, 17) (incl ext 157675) | val (11495, 9)
+[Step3][Prep] Fold 3: train (203657, 17) (incl ext 157675) | val (11495, 9)
+[Step3][Prep] Fold 4: train (203657, 17) (incl ext 157675) | val (11495, 9)
+[Step3][Prep] Wrote per-fold train/val CSVs to data/fold_data/
+[Step3] LLaMA base: /scratch-shared/tc1proj005/post_pretrain_llama3-8b_merged | tokenizer: meta-llama/Meta-Llama-3.1-8B | skip=0
+[Step3] Qwen base:  /scratch-shared/tc1proj005/post_pretrain_qwen2-72b_merged | tokenizer: Qwen/Qwen2.5-14B | skip=0
+[Step3] LLaMA fold 0 train csv: data/fold_data/fold_0_train.csv
+[DEBUG] Trainable params: 41,943,040 / 4,582,543,360 (0.9153%)
+[WARN] load_dataset csv auto-infer failed: DatasetGenerationError: An error occurred while generating the dataset
+[WARN] Falling back to pandas coercion mode.
+[INFO] Fallback dataset constructed: 203656 rows | columns: ['id', 'model_a', 'model_b', 'prompt', 'response_a', 'response_b', 'winner_model_a', 'winner_model_b', 'winner_tie', 'source', 'chosen', 'chosen-rating', 'chosen-model', 'rejected', 'rejected-rating']...
+{'loss': 1.281, 'grad_norm': 0.4643966853618622, 'learning_rate': 5.128205128205128e-06, 'epoch': 0.0}
+{'train_runtime': 1188.5752, 'train_samples_per_second': 0.262, 'train_steps_per_second': 0.033, 'train_loss': 1.24653566800631, 'epoch': 0.0}
+[Merge] Saving merged model to model_save/llama_fold_0
+[Step3] Qwen fold 0 train csv: data/fold_data/fold_0_train.csv
+[DEBUG] Trainable params: 68,812,800 / 8,232,817,664 (0.8358%)
+[WARN] load_dataset csv auto-infer failed: DatasetGenerationError: An error occurred while generating the dataset
+[WARN] Falling back to pandas coercion mode.
+[INFO] Fallback dataset constructed: 203656 rows | columns: ['id', 'model_a', 'model_b', 'prompt', 'response_a', 'response_b', 'winner_model_a', 'winner_model_b', 'winner_tie', 'source', 'chosen', 'chosen-rating', 'chosen-model', 'rejected', 'rejected-rating']...
+{'loss': 1.0928, 'grad_norm': 0.30217093229293823, 'learning_rate': 5.128205128205128e-06, 'epoch': 0.0}
+{'train_runtime': 2012.0953, 'train_samples_per_second': 0.155, 'train_steps_per_second': 0.019, 'train_loss': 1.0691904410337791, 'epoch': 0.0}
+[Merge][Warn] GPU OOM during merge; retrying with low-memory CPU path...
+[Merge] Low-memory CPU merge path engaged (forcing CPU load, minimal dtype)
+[Merge] Saving merged model to model_save/qwen_fold_0
+[Step3] LLaMA fold 1 train csv: data/fold_data/fold_1_train.csv
+[DEBUG] Trainable params: 41,943,040 / 4,582,543,360 (0.9153%)
+[WARN] load_dataset csv auto-infer failed: DatasetGenerationError: An error occurred while generating the dataset
+[WARN] Falling back to pandas coercion mode.
+[INFO] Fallback dataset constructed: 203656 rows | columns: ['id', 'model_a', 'model_b', 'prompt', 'response_a', 'response_b', 'winner_model_a', 'winner_model_b', 'winner_tie', 'source', 'chosen', 'chosen-rating', 'chosen-model', 'rejected', 'rejected-rating']...
+{'loss': 1.2652, 'grad_norm': 0.4462248980998993, 'learning_rate': 5.128205128205128e-06, 'epoch': 0.0}
+{'train_runtime': 1185.4601, 'train_samples_per_second': 0.263, 'train_steps_per_second': 0.033, 'train_loss': 1.2338386926895533, 'epoch': 0.0}
+[Merge] Saving merged model to model_save/llama_fold_1

@@ -1,0 +1,18 @@
+
+Test: B wins clearly
+  model_a: 0.0208
+  model_b: 0.9619
+  tie:     0.0173
+  ❌ FAIL (still random)
+
+Test: A and B are close
+  model_a: 0.0824
+  model_b: 0.6086
+  tie:     0.3089
+  ❌ FAIL (still random)
+
+Test: B wins clearly
+  model_a: 0.3073
+  model_b: 0.3943
+  tie:     0.2984
+  ❌ FAIL (still random)

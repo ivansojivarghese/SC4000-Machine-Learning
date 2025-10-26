@@ -5,6 +5,44 @@ import torch
 from transformers import AutoModelForSequenceClassification
 
 
+def _has_weight_files(path: str) -> bool:
+    try:
+        files = os.listdir(path)
+    except Exception:
+        return False
+    patterns = (
+        'pytorch_model.bin',
+        'model.safetensors',
+        'pytorch_model.bin.index.json',
+        'model.safetensors.index.json',
+        'tf_model.h5',
+        'model.ckpt.index',
+        'flax_model.msgpack',
+    )
+    return any(any(f.startswith(p.split('.')[0]) and p.split('.')[-1] in f for f in files) or (p in files) for p in patterns)
+
+
+def _resolve_base_dir(model_dir: str) -> str:
+    """If model_dir is a lightweight quantized folder, redirect to the real base model dir."""
+    # Preferred pointers written by our quantizer
+    for fname in ('target_model_dir.txt', 'base_model_dir.txt'):
+        ptr = os.path.join(model_dir, fname)
+        if os.path.exists(ptr):
+            try:
+                with open(ptr, 'r') as f:
+                    base = f.read().strip()
+                if base:
+                    return base
+            except Exception:
+                pass
+    # If no weights in current folder and BASE_MODEL env is set, use it
+    if not _has_weight_files(model_dir):
+        env_base = os.environ.get('BASE_MODEL', '').strip()
+        if env_base:
+            return env_base
+    return model_dir
+
+
 def export_head(model_dir: str, out_path: str = None):
     # Try to read num_labels from config; default to 3
     cfg_path = os.path.join(model_dir, 'config.json')
@@ -18,9 +56,10 @@ def export_head(model_dir: str, out_path: str = None):
             pass
 
     # Ensure model is instantiated with correct head size to avoid PEFT modules_to_save mismatch
+    load_dir = _resolve_base_dir(model_dir)
     try:
         model = AutoModelForSequenceClassification.from_pretrained(
-            model_dir,
+            load_dir,
             num_labels=num_labels,
             ignore_mismatched_sizes=True,
             trust_remote_code=True,
@@ -41,7 +80,7 @@ def export_head(model_dir: str, out_path: str = None):
             pass
         # Retry with updated num_labels if changed, else re-raise
         model = AutoModelForSequenceClassification.from_pretrained(
-            model_dir,
+            load_dir,
             num_labels=num_labels,
             ignore_mismatched_sizes=True,
             trust_remote_code=True,

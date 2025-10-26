@@ -86,6 +86,25 @@ def has_weight_files(d: str) -> bool:
         return True
     return False
 
+def is_sequence_classification_dir(d: str) -> bool:
+    """Heuristic: detect sequence-classification checkpoints which are unsuitable for CausalLM scoring."""
+    try:
+        if not d or not os.path.isdir(d):
+            return False
+        cfg_path = os.path.join(d, 'config.json')
+        if not os.path.isfile(cfg_path):
+            return False
+        with open(cfg_path, 'r') as f:
+            cfg = json.load(f)
+        arch = cfg.get('architectures') or []
+        if any('SequenceClassification' in str(a) for a in arch):
+            return True
+        if 'num_labels' in cfg:
+            return True
+    except Exception:
+        pass
+    return False
+
 STRICT_NONEMPTY = os.environ.get('INFER_STRICT_NONEMPTY','0')=='1'
 def load_rows(path: str):
     try:
@@ -314,12 +333,25 @@ for fold in FOLDS:
                 print(f"[Step4][Warn] Missing merged weights for {name} fold {fold} (dir={load_dir}); consider INFER_PREFER_LORA=1 if LoRA exists.")
                 continue
 
+        # If merged dir looks like a sequence-classification checkpoint, fall back to base for causal LM scoring
+        if (not using_lora) and is_sequence_classification_dir(load_dir):
+            print(f"[Step4][Warn] Detected SequenceClassification checkpoint at {load_dir}. Falling back to base model {base_map.get(name)} for causal LM scoring.")
+            base_dir = base_map.get(name)
+            if base_dir and os.path.isdir(base_dir):
+                load_dir = base_dir
+            else:
+                print(f"[Step4][Error] Base model dir missing for {name}; cannot score with CausalLM. Skipping.")
+                continue
+
         source_desc = f"LoRA {lora_dir} + base {base_map.get(name)}" if using_lora else load_dir
         print(f"[Step4] Loading {name} fold {fold} from {source_desc}")
         # Robust tokenizer loading with fallback if tokenizer assets were pruned from fold dir.
         def load_tokenizer_with_fallback(model_name:str, model_dir:str):
             # Environment overrides
             env_specific = os.environ.get(f'{model_name.upper()}_TOKENIZER_PATH')
+            # Also support *_TOK shorthand commonly used in our envs (e.g., LLAMA_TOK, QWEN_TOK)
+            if not env_specific:
+                env_specific = os.environ.get(f'{model_name.upper()}_TOK')
             generic_fallback = os.environ.get('FALLBACK_TOKENIZER_PATH')
             base_dir_env = os.environ.get(f'{model_name.upper()}_BASE_DIR')
             tried = []
@@ -382,12 +414,14 @@ for fold in FOLDS:
                 print(f"[Step4][Error] Failed applying LoRA {lora_dir} to base {base_dir_for_load}: {e}")
                 continue
         else:
-            model = AutoModelForCausalLM.from_pretrained(mdir, device_map='auto', torch_dtype=torch.float16, trust_remote_code=True)
+            # load merged causal LM (or base if we fell back)
+            model = AutoModelForCausalLM.from_pretrained(load_dir, device_map='auto', torch_dtype=torch.float16, trust_remote_code=True)
         # Safe placement: if accelerate assigned a device_map (offloading), do NOT call model.to(DEVICE)
         if hasattr(model, 'hf_device_map'):
             print('[Step4][Info] Accelerate device_map detected; skipping explicit model.to().')
         else:
             try:
+                print(DEVICE)
                 model.to(DEVICE)
             except RuntimeError as e:
                 print(f'[Step4][Warn] model.to({DEVICE}) failed (continuing with existing placement): {e}')
@@ -412,20 +446,45 @@ for fold in FOLDS:
                 print(f"[Step4][Subset] {name} fold {fold}: subset matches available {cur_n} rows.")
         records_train = model_train_df.to_dict('records')
         texts_train = [extract_text(r) for r in records_train]
+        print(f"[Step4][Debug] Preparing last-token repr on {len(texts_train)} texts (SAVE_LASTTOK={SAVE_LASTTOK})", flush=True)
         rep = batched_lasttok_repr(model, tok, texts_train, max_len=min(getattr(tok,'model_max_length',1024),1024))
         if rep is not None:
             save_obj(f'model_save/teacher_logits/{name}_fold_{fold}_train_lasttok_logits.pt', rep)
 
         if {'response_a','response_b'} <= set(model_train_df.columns):
             prompts = [build_prompt(r) for r in records_train]
-            batch_sz = int(os.environ.get('INFER_LOGPROB_BATCH','0') or '0')
+            # Determine batch size with sensible defaults if not provided
+            env_bs = int(os.environ.get('INFER_LOGPROB_BATCH','0') or '0')
+            if env_bs <= 0:
+                try:
+                    if torch.cuda.is_available():
+                        total_mem = torch.cuda.get_device_properties(0).total_memory
+                        # Heuristic defaults by VRAM
+                        if total_mem >= 22*(1024**3):
+                            batch_sz = 8
+                        elif total_mem >= 15*(1024**3):
+                            batch_sz = 4
+                        elif total_mem >= 10*(1024**3):
+                            batch_sz = 3
+                        elif total_mem >= 7*(1024**3):
+                            batch_sz = 2
+                        else:
+                            batch_sz = 1
+                    else:
+                        batch_sz = 1
+                except Exception:
+                    batch_sz = 2
+            else:
+                batch_sz = env_bs
             progress_every = int(os.environ.get('INFER_PROGRESS_EVERY','50') or '50')
+            print(f"[Step4][Debug] Starting TRAIN log-likelihood (N={len(records_train)}), batch_size={batch_sz}, progress_every={progress_every}", flush=True)
             ra_inputs = [str(r.get('response_a','')) for r in records_train]
             rb_inputs = [str(r.get('response_b','')) for r in records_train]
             if batch_sz > 1:
-                print(f"[Step4] Using batched loglik batch_size={batch_sz} progress_every={progress_every}")
+                print(f"[Step4] Using batched loglik batch_size={batch_sz} progress_every={progress_every}", flush=True)
                 logp_a, logp_b = compute_pair_loglik_batched(model, tok, prompts, ra_inputs, rb_inputs, max_len=1024, batch_size=batch_sz, progress_every=progress_every)
             else:
+                print(f"[Step4] Using non-batched loglik (very slow). Consider setting INFER_LOGPROB_BATCH>1.", flush=True)
                 logp_a, logp_b = compute_pair_loglik(model, tok, prompts, ra_inputs, rb_inputs, max_len=1024)
             logp_t = 0.5*(logp_a + logp_b)
             raw = torch.stack([logp_a, logp_b, logp_t], dim=1)
@@ -442,14 +501,36 @@ for fold in FOLDS:
         if CALC_VAL and val_df is not None and {'response_a','response_b'} <= set(val_df.columns):
             v_records = val_df.to_dict('records')
             v_prompts = [build_prompt(r) for r in v_records]
-            batch_sz = int(os.environ.get('INFER_LOGPROB_BATCH','0') or '0')
+            env_bs = int(os.environ.get('INFER_LOGPROB_BATCH','0') or '0')
+            if env_bs <= 0:
+                try:
+                    if torch.cuda.is_available():
+                        total_mem = torch.cuda.get_device_properties(0).total_memory
+                        if total_mem >= 22*(1024**3):
+                            batch_sz = 8
+                        elif total_mem >= 15*(1024**3):
+                            batch_sz = 4
+                        elif total_mem >= 10*(1024**3):
+                            batch_sz = 3
+                        elif total_mem >= 7*(1024**3):
+                            batch_sz = 2
+                        else:
+                            batch_sz = 1
+                    else:
+                        batch_sz = 1
+                except Exception:
+                    batch_sz = 2
+            else:
+                batch_sz = env_bs
             progress_every = int(os.environ.get('INFER_PROGRESS_EVERY','50') or '50')
+            print(f"[Step4][Debug] Starting VAL log-likelihood (N={len(v_records)}), batch_size={batch_sz}, progress_every={progress_every}", flush=True)
             va_inputs = [str(r.get('response_a','')) for r in v_records]
             vb_inputs = [str(r.get('response_b','')) for r in v_records]
             if batch_sz > 1:
-                print(f"[Step4] (val) Using batched loglik batch_size={batch_sz} progress_every={progress_every}")
+                print(f"[Step4] (val) Using batched loglik batch_size={batch_sz} progress_every={progress_every}", flush=True)
                 v_logp_a, v_logp_b = compute_pair_loglik_batched(model, tok, v_prompts, va_inputs, vb_inputs, max_len=1024, batch_size=batch_sz, progress_every=progress_every)
             else:
+                print(f"[Step4] (val) Using non-batched loglik (very slow). Consider setting INFER_LOGPROB_BATCH>1.", flush=True)
                 v_logp_a, v_logp_b = compute_pair_loglik(model, tok, v_prompts, va_inputs, vb_inputs, max_len=1024)
             v_logp_t = 0.5*(v_logp_a + v_logp_b)
             v_raw = torch.stack([v_logp_a, v_logp_b, v_logp_t], dim=1)
@@ -481,9 +562,6 @@ else:
 
 print('[Step4] Finished.')
 PY
-
-echo "[Step4] Validating shapes"
-# TODO: Update validator to accommodate new path pattern if needed
 python teacher_logits_validator.py || echo "[Step4][Warn] Validator failed; adjust validator script to new file naming."
 
 echo "[Step4] Done"

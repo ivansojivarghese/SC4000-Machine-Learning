@@ -368,7 +368,29 @@ def infer(
     probs = probs_accum / len(lengths)
     probs = np.clip(probs, 1e-9, None)
     probs = probs / probs.sum(axis=1, keepdims=True)
+    """
+    # ========== POST-PROCESSING FIX: Reduce Excessive Tie Predictions ==========
+    print(f"\n[INFO] Applying tie prediction correction...")
+    print(f"  Before: mean_tie={probs[:, 2].mean():.4f}, mean_a={probs[:, 0].mean():.4f}, mean_b={probs[:, 1].mean():.4f}")
 
+    # Reduce tie predictions by 40% (adjust if needed)
+    tie_reduction_factor = 0.6  # Keep 60% of tie probability
+    original_tie = probs[:, 2].copy()
+    probs[:, 2] = probs[:, 2] * tie_reduction_factor
+
+    # Redistribute the reduced tie probability to model_a and model_b
+    reduction_amount = original_tie - probs[:, 2]
+    probs[:, 0] += reduction_amount * 0.4  # Give 40% to model_a
+    probs[:, 1] += reduction_amount * 0.6  # Give 60% to model_b (historically more common)
+
+    # Renormalize to ensure probabilities sum to 1.0
+    row_sums = probs.sum(axis=1, keepdims=True)
+    probs = probs / row_sums
+
+    print(f"  After:  mean_tie={probs[:, 2].mean():.4f}, mean_a={probs[:, 0].mean():.4f}, mean_b={probs[:, 1].mean():.4f}")
+    print(f"[INFO] Tie correction applied successfully.")
+    # ===========================================================================
+    """
     sub = pd.DataFrame({
         'id': df['id'],
         'winner_model_a': probs[:, 0],
@@ -384,8 +406,8 @@ def main():
     ap.add_argument('--model-dir', required=True, help='Path to GPTQ quantized model directory')
     ap.add_argument('--test-csv', default='./data/test.csv')
     ap.add_argument('--out', default='./sub/student_submission.csv')
-    ap.add_argument('--head-path', default=None, help='Path to classifier_head.pt (state_dict for nn.Linear)')
-    ap.add_argument('--classifier-from-dir', default=None, help='Directory of a seq-classification model to extract head and calibration.json')
+    ap.add_argument('--head-path', default='./model_save/distilled_gemma2-9b_fold_0/classifier_head.pt', help='Path to classifier_head.pt (state_dict for nn.Linear)')
+    ap.add_argument('--classifier-from-dir', default='./model_save/distilled_gemma2-9b_fold_0', help='Directory of a seq-classification model to extract head and calibration.json')
     ap.add_argument('--tta-lengths', default='', help='Comma-separated list, e.g. 512,1024')
     ap.add_argument('--batch-size', type=int, default=8)
     ap.add_argument('--max-length', type=int, default=512)

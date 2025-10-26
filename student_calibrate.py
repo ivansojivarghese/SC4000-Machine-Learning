@@ -8,7 +8,7 @@ Temperature scaling for the trained student classifier.
 
 import json
 import os
-from typing import Dict
+from typing import Dict, Optional, List
 
 import numpy as np
 import pandas as pd
@@ -87,10 +87,13 @@ def fit_temperature(logits: np.ndarray, labels: np.ndarray) -> float:
 def calibrate_student(
     model_dir: str = './model_save/student_distilbert',
     train_csv: str = './data/train.csv',
-    output_json: str = './model_save/student_distilbert/calibration.json',
+    output_json: Optional[str] = None,
     batch_size: int = 16,
     max_length: int = 512,
 ) -> Dict:
+    # Default save path: alongside the provided student model directory
+    if not output_json:
+        output_json = os.path.join(model_dir, 'calibration.json')
     os.makedirs(os.path.dirname(output_json), exist_ok=True)
 
     dataset = load_dataset_for_cal(train_csv)
@@ -102,8 +105,156 @@ def calibrate_student(
     cal_ds = split2['train']
     holdout_ds = split2['test']
 
-    tokenizer = AutoTokenizer.from_pretrained(model_dir, use_fast=False)
-    model = AutoModelForSequenceClassification.from_pretrained(model_dir)
+    # Robust tokenizer resolution: prefer local tokenizer in model_dir; fall back to env/base model
+    def _has_tok_files(p: str) -> bool:
+        try:
+            if not os.path.isdir(p):
+                return False
+            names = set(os.listdir(p))
+            want = {"tokenizer.model", "tokenizer.json", "tokenizer_config.json", "vocab.json", "merges.txt"}
+            return len(want.intersection(names)) > 0
+        except Exception:
+            return False
+
+    tok_candidates: List[str] = []
+    # 1) local directory if tokenizer artifacts exist
+    if _has_tok_files(model_dir):
+        tok_candidates.append(model_dir)
+    # 2) explicit env overrides
+    env_tok = os.environ.get('TOKENIZER_DIR')
+    if env_tok:
+        tok_candidates.append(env_tok)
+    env_base = os.environ.get('BASE_MODEL') or os.environ.get('FALLBACK_BASE_MODEL_DIR')
+    if env_base:
+        tok_candidates.append(env_base)
+    # 3) sensible default for this project
+    tok_candidates.append('google/gemma-2-9b-it')
+
+    tokenizer = None
+    last_err: Optional[Exception] = None
+    for cand in tok_candidates:
+        try:
+            tokenizer = AutoTokenizer.from_pretrained(cand, use_fast=True, trust_remote_code=True)
+            break
+        except Exception as e1:
+            last_err = e1
+            try:
+                tokenizer = AutoTokenizer.from_pretrained(cand, use_fast=False, trust_remote_code=True)
+                break
+            except Exception as e2:
+                last_err = e2
+                continue
+    if tokenizer is None:
+        raise RuntimeError(f"Failed to load tokenizer. Tried candidates: {tok_candidates}. Last error: {last_err}")
+    # Resolve a valid local model directory (the root or a checkpoint subdir) with config and weights
+    def _has_weights(names: set) -> bool:
+        if any(n in names for n in (
+            'pytorch_model.bin', 'model.safetensors', 'pytorch_model.bin.index.json', 'model.safetensors.index.json'
+        )):
+            return True
+        if any(n.startswith('pytorch_model-') and n.endswith('.bin') for n in names):
+            return True
+        if any(n.startswith('model-') and n.endswith('.safetensors') for n in names):
+            return True
+        return False
+
+    def _pick_local_model_dir(root: str) -> str:
+        # If root has config and weights, use it
+        if os.path.isdir(root):
+            names = set(os.listdir(root))
+            if 'config.json' in names and _has_weights(names):
+                return root
+        # Otherwise scan common checkpoint subdirs under root
+        candidates: list[tuple[float, str]] = []
+        try:
+            for entry in os.scandir(root):
+                if not entry.is_dir():
+                    continue
+                sub = entry.path
+                try:
+                    sub_names = set(os.listdir(sub))
+                except Exception:
+                    continue
+                if 'config.json' in sub_names and _has_weights(sub_names):
+                    try:
+                        mtime = os.path.getmtime(sub)
+                    except Exception:
+                        mtime = 0.0
+                    candidates.append((mtime, sub))
+        except Exception:
+            pass
+        if candidates:
+            candidates.sort(reverse=True)
+            return candidates[0][1]
+        return ''
+
+    def _is_valid_model_dir(path: str) -> bool:
+        try:
+            if not os.path.isdir(path):
+                return False
+            names = set(os.listdir(path))
+            if 'config.json' not in names:
+                return False
+            return _has_weights(names)
+        except Exception:
+            return False
+
+    # Resolve candidate model dirs in order of preference
+    candidates: List[str] = []
+    # 1) Given model_dir (root if valid, else latest checkpoint under it)
+    if os.path.isdir(model_dir):
+        if _is_valid_model_dir(model_dir):
+            candidates.append(model_dir)
+        else:
+            chosen = _pick_local_model_dir(model_dir)
+            if chosen:
+                candidates.append(chosen)
+    # 2) Env override
+    env_student = os.environ.get('STUDENT_MODEL_DIR')
+    if env_student and _is_valid_model_dir(env_student):
+        candidates.append(env_student)
+    # 3) Default stable location
+    default_dir = os.path.join('.', 'model_save', 'student_distilbert')
+    if _is_valid_model_dir(default_dir):
+        candidates.append(default_dir)
+    # 4) Parent scan: look for a child named 'student_distilbert' next to the given dir
+    try:
+        parent = os.path.dirname(os.path.abspath(model_dir))
+        sibling = os.path.join(parent, 'student_distilbert')
+        if _is_valid_model_dir(sibling):
+            candidates.append(sibling)
+    except Exception:
+        pass
+
+    # Dedup while preserving order
+    seen = set()
+    candidates = [c for c in candidates if c and (c not in seen and not seen.add(c))]
+
+    load_dir = None
+    for cand in candidates:
+        load_dir = cand
+        break
+    if load_dir is None:
+        # last resort: use given path with local_files_only to yield a clear message
+        load_dir = model_dir
+    # Try local-only first to avoid treating local paths as HF repo ids
+    model = None
+    last_err = None
+    for local_only in (True, False):
+        try:
+            model = AutoModelForSequenceClassification.from_pretrained(
+                load_dir,
+                local_files_only=local_only,
+                trust_remote_code=True,
+            )
+            break
+        except Exception as e:
+            last_err = e
+            continue
+    if model is None:
+        raise RuntimeError(
+            f"Failed to load student model. Tried candidates={candidates or [model_dir]}. Last error: {last_err}"
+        )
     model.eval()
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model.to(device)
@@ -167,6 +318,8 @@ def calibrate_student(
 
     with open(output_json, 'w') as f:
         json.dump(payload, f, indent=2)
+    # Optional: print save path for visibility when called from scripts
+    print(f"[calibrate_student] Saved calibration to {output_json}")
 
     return payload
 

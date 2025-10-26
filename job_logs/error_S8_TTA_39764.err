@@ -1,0 +1,2 @@
+Loading checkpoint shards:   0%|          | 0/4 [00:00<?, ?it/s]Loading checkpoint shards:  25%|██▌       | 1/4 [00:03<00:09,  3.23s/it]Loading checkpoint shards:  50%|█████     | 2/4 [00:07<00:07,  3.72s/it]Loading checkpoint shards:  75%|███████▌  | 3/4 [00:11<00:03,  3.88s/it]Loading checkpoint shards: 100%|██████████| 4/4 [00:14<00:00,  3.54s/it]Loading checkpoint shards: 100%|██████████| 4/4 [00:14<00:00,  3.60s/it]
+Loading adapter weights from ./model_save/distilled_gemma2-9b_fold_0 led to unexpected keys not found in the model: score.weight. 

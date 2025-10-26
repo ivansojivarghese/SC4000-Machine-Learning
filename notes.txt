@@ -2,9 +2,10 @@ Suggested pipeline flow:
 
 Step 1: Post-pretrain large models on UT dataset
 Step 2: Split Kaggle + 33k data into 5 folds
-Step 3: Train LLaMA3 70B & Qwen2 72B on folds
-Step 4: Infer logits for all training data
-Step 5: Distill logits into Gemma2-9B model
+Step 3: Train LLaMA3 70B & Qwen2 72B on folds 
+Step 4: Infer logits for all training data 
+Step 5: Distill logits into Gemma2-9B model [Fold 0 being used, Steps after this point not very successful]
+
 Step 6: Ensemble LoRA layers from 5 folds
 Step 7: Quantize final model to 8-bit (GPTQ)
 Step 8: Apply TTA during inference
@@ -46,35 +47,14 @@ Step 3:
 TEACHER_SUBSET_SIZE=20000 TEACHER_MAX_STEPS=400 TEACHER_FOLDS="0" SKIP_QWEN=1 sbatch step3_train_teachers.sh
 TEACHER_SUBSET_SIZE=20000 TEACHER_MAX_STEPS=400 TEACHER_FOLDS="0" SKIP_LLAMA=1 sbatch step3_train_teachers.sh
 
-
-
 ---
 
 Step 4:
 
-INFER_SAVE_LASTTOK=0 INFER_FORCE_REGEN=1 sbatch step4_infer_teacher_logits.sh
-OR
-INFER_PREFER_LORA=1 INFER_LLAMA_SUBSET=15000-20000 INFER_QWEN_SUBSET=9000-10000 INFER_SUBSET_SEED=42 sbatch step4_infer_teacher_logits.sh
-OR
-INFER_FOLDS=0 \
-INFER_PREFER_LORA=1 \
-INFER_LLAMA_SUBSET=15000-20000 \
-INFER_QWEN_SUBSET=9000-10000 \
-INFER_LOGPROB_BATCH=8 \
-sbatch step4_infer_teacher_logits.sh
+FOLD=0 INFER_MODELS=llama INFER_SAVE_LASTTOK=0 INFER_FORCE_REGEN=1 sbatch step4_infer_fold.sh
 
-OR
+INFER_FOLDS=0 INFER_MODELS=llama INFER_PREFER_LORA=1 INFER_LLAMA_SUBSET=15000-20000 INFER_LOGPROB_BATCH=8 INFER_PROGRESS_EVERY=5 sbatch step4_infer_teacher_logits.sh
 
-INFER_FOLDS=0 INFER_PREFER_LORA=1 INFER_LLAMA_SUBSET=500-1000 INFER_QWEN_SUBSET=250-500 INFER_LOGPROB_BATCH=8 sbatch step4_infer_teacher_logits.sh
-
-OR
-
-INFER_FOLDS=0 INFER_PREFER_LORA=1 INFER_LLAMA_SUBSET=12000 INFER_QWEN_SUBSET=200 INFER_LOGPROB_BATCH=8 sbatch step4_infer_teacher_logits.sh
--
-INFER_FOLDS=1 INFER_PREFER_LORA=1 INFER_LLAMA_SUBSET=100 INFER_QWEN_SUBSET=200 INFER_LOGPROB_BATCH=8 sbatch step4_infer_teacher_logits.sh
--
-INFER_FOLDS=all INFER_MODELS=llama INFER_PREFER_LORA=1 INFER_LLAMA_SUBSET=15000-20000 INFER_LOGPROB_BATCH=8 sbatch step4_infer_teacher_logits.sh
--
 INFER_FOLDS=1 INFER_MODELS=llama INFER_PREFER_LORA=1 INFER_LLAMA_SUBSET=15000-20000 INFER_LOGPROB_BATCH=8 INFER_PROGRESS_EVERY=5 sbatch step4_infer_teacher_logits.sh
 -
 INFER_FOLDS=2 INFER_MODELS=llama INFER_PREFER_LORA=1 INFER_LLAMA_SUBSET=15000-20000 INFER_LOGPROB_BATCH=8 INFER_PROGRESS_EVERY=5 sbatch step4_infer_teacher_logits.sh
@@ -83,6 +63,7 @@ INFER_FOLDS=3 INFER_MODELS=llama INFER_PREFER_LORA=1 INFER_LLAMA_SUBSET=15000-20
 -
 INFER_FOLDS=4 INFER_MODELS=llama INFER_PREFER_LORA=1 INFER_LLAMA_SUBSET=15000-20000 INFER_LOGPROB_BATCH=8 INFER_PROGRESS_EVERY=5 sbatch step4_infer_teacher_logits.sh
 
+---
 
 Step 5:
 
@@ -99,37 +80,32 @@ FOLDS=2 sbatch step5_distill_student.sh
 FOLDS=3 sbatch step5_distill_student.sh
 -
 FOLDS=4 sbatch step5_distill_student.sh
--
-TO RESUME ALL FOLDS ABOVE (FOLDS 0,1,2,3,4 AT 2 EPOCHS EACH)
 
-
+---
 
 Step 6:
 
 sbatch step6_lora_ensemble.sh
 
-
+---
 
 Step 7: 
 
 sbatch step7_quantize_gptq.sh
 
-
-
+---
 
 Step 8:
 
 sbatch step8_infer_tta.sh
 
-
+---
 
 Step 9:
 
 sbatch step9_eval.sh (OPTIONAL TO RUN)
 
-
 ---
-
 
 2. Recommended Steps (based on top solutions):
 A. Teacher Training

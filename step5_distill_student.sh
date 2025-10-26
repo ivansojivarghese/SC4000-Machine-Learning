@@ -47,7 +47,7 @@ ALPHA=${STUDENT_ALPHA:-0.7}
 MSE_W=${STUDENT_MSE_WEIGHT:-0.1}
 LABEL_SMOOTH=${STUDENT_LABEL_SMOOTH:-0.05}
 MAXLEN=${STUDENT_MAXLEN:-384}
-MAX_STEPS=${STUDENT_MAX_STEPS:-5800}
+MAX_STEPS=${STUDENT_MAX_STEPS:-2600}
 RESUME_CHECKPOINT=${RESUME_CHECKPOINT:-}
 OVERWRITE=${STUDENT_OVERWRITE:-0}
 
@@ -86,7 +86,7 @@ python -u student_train_distill_hf.py \
   --fp16 --gradient_checkpointing --use_fast_tokenizer \
   --load_in_4bit --use_lora --lora_r 16 --lora_alpha 32 --lora_dropout 0.05 \
   --dataloader_num_workers 4 \
-  --num_folds 5 --fold_idx $FOLD
+  --num_folds 5 --fold_idx $FOLD \
   --evaluation_strategy epoch \
   --save_strategy epoch \
   --save_total_limit 1 \

@@ -1,0 +1,6 @@
+[Step5] Distilling fold 4 using LLaMA-only OOF probs
+{'loss': 11.5044, 'grad_norm': 78.31190490722656, 'learning_rate': 6.260229132569558e-07, 'epoch': 0.99}
+{'loss': 12.3902, 'grad_norm': 115.71381378173828, 'learning_rate': 1.2274959083469723e-08, 'epoch': 1.01}
+{'train_runtime': 1196.2311, 'train_samples_per_second': 34.776, 'train_steps_per_second': 2.173, 'train_loss': 0.4595123525766226, 'epoch': 1.01}
+{'eval': {'eval_loss': 0.7864114046096802, 'eval_log_loss': 1.058579839556032, 'eval_accuracy': 0.4611872146118721, 'eval_runtime': 1037.0502, 'eval_samples_per_second': 4.435, 'eval_steps_per_second': 4.435, 'epoch': 1.0054128506874804}}
+[Step5] Done fold 4 -> model_save/distilled_gemma2-9b_fold_4

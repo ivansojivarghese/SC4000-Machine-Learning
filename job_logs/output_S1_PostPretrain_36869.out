@@ -1,0 +1,39 @@
+[Step1] Resolving SCRATCH_BASE...
+[Debug] SCRATCH_BASE resolved to: /scratch-shared/tc1proj005
+[Step1] Working dir: /home/UG/ivansoji001/exported-assets_sc4000
+[Step1] Home dir: /home/UG/ivansoji001
+[Step1] SCRATCH_BASE: /scratch-shared/tc1proj005
+[Step1] HF_HOME: /scratch-shared/tc1proj005
+[Step1] HUGGINGFACE_HUB_CACHE: /scratch-shared/tc1proj005
+[Step1] HF_DATASETS_CACHE: /scratch-shared/tc1proj005
+[Step1] TRANSFORMERS_CACHE: /scratch-shared/tc1proj005
+[Step1] UT_DATA: data/ultrafeedback.csv | EPOCHS: 1 | LR: 1e-5 | MAXLEN: 512 | PER_DEVICE_BS: 2 | MAX_STEPS: -1 | LORA_R: 16 | LORA_ALPHA: 32
+[Step1][Estimate] Steps=250 (~1h) within budget 6h.
+[Step1] Deps OK
+[Step1] Online mode enabled (TRANSFORMERS_OFFLINE=0)
+[Step1] Downloading tokenizer files for Qwen/Qwen2.5-72B...
+[Step1] Tokenizer snapshot at: /scratch-shared/tc1proj005/models--Qwen--Qwen2.5-72B/snapshots/efba10c8e54e91e0d9570ab5f7b51a958474d4cb
+[Step1] Prefetched tokenizer: vocab size 151665
+[Step1] Starting post-pretraining (LoRA/QLoRA)
+[Step1] Selected stage: gemma
+[Step1] Disk check for /scratch-shared/tc1proj005: need 40G, avail 85603G
+[Step1] Cleaning HF cache at /scratch-shared/tc1proj005
+[Step1] Skipping cache clean to avoid wiping SCRATCH_BASE root
+[Step1] Gemma2-9B LoRA: starting
+[Step1] Gemma args: --base-model google/gemma-2-9b --output-dir /scratch-shared/tc1proj005/post_pretrain_gemma2-9b_lora --data-path data/ultrafeedback.csv --tokenizer-path google/gemma-2-9b --bf16 --attn-impl eager --load-8bit --grad-accum 16 --subset-size 8000 --epochs 1 --lr 1e-5 --max-length 512 --r 16 --lora-alpha 32 --per-device-batch 2
+[DEBUG] Trainable params: 54,018,048 / 9,295,724,032 (0.5811%)
+[INFO] Subsetting training data: 8000 / 157675 examples (requested 8000)
+{'loss': 0.9774, 'grad_norm': 1.6315492391586304, 'learning_rate': 9.240000000000001e-06, 'epoch': 0.08}
+{'loss': 0.8791, 'grad_norm': 0.44171008467674255, 'learning_rate': 8.44e-06, 'epoch': 0.16}
+{'loss': 0.8202, 'grad_norm': 0.27841997146606445, 'learning_rate': 7.640000000000001e-06, 'epoch': 0.24}
+{'loss': 0.8307, 'grad_norm': 0.28403374552726746, 'learning_rate': 6.8400000000000014e-06, 'epoch': 0.32}
+{'loss': 0.7943, 'grad_norm': 0.27039775252342224, 'learning_rate': 6.040000000000001e-06, 'epoch': 0.4}
+{'loss': 0.8109, 'grad_norm': 0.2958116829395294, 'learning_rate': 5.240000000000001e-06, 'epoch': 0.48}
+{'loss': 0.7849, 'grad_norm': 0.3018161654472351, 'learning_rate': 4.440000000000001e-06, 'epoch': 0.56}
+{'loss': 0.8005, 'grad_norm': 0.27076295018196106, 'learning_rate': 3.6400000000000003e-06, 'epoch': 0.64}
+{'loss': 0.7836, 'grad_norm': 0.30464592576026917, 'learning_rate': 2.84e-06, 'epoch': 0.72}
+{'loss': 0.796, 'grad_norm': 0.29676374793052673, 'learning_rate': 2.04e-06, 'epoch': 0.8}
+{'loss': 0.7827, 'grad_norm': 0.3034578263759613, 'learning_rate': 1.2400000000000002e-06, 'epoch': 0.88}
+{'loss': 0.7841, 'grad_norm': 0.294137567281723, 'learning_rate': 4.4e-07, 'epoch': 0.96}
+{'train_runtime': 19703.678, 'train_samples_per_second': 0.406, 'train_steps_per_second': 0.013, 'train_loss': 0.8189719944000244, 'epoch': 1.0}
+[Step1] Stage 'gemma' completed

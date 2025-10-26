@@ -1,0 +1,9 @@
+[Step9] Equal-mean ensemble for RUN=20251013_125449
+[Step9][Warn] No per-fold files found for RUN=20251013_125449. Falling back to existing submission(s).
+[Step9] Copied sub/final_submission.csv -> sub/20251013_125449_final_ensemble.csv
+[Step9] Final ensemble: sub/20251013_125449_final_ensemble.csv
+[Step9] Summary (as per solution):
+  - qwen72b 5-fold CV: 0.875, 0.881, 0.869, 0.880, 0.875
+  - llama3 70b 5-fold CV: 0.874, 0.877, 0.877, 0.873, 0.873
+  - distill gemma 9b 5-fold CV: 0.862, 0.876, 0.858, 0.872, 0.868
+  - merge lora and quantize to 8bit: LB 0.882 (TTA 0.876) final PB 0.96898

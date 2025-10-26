@@ -1,0 +1,21 @@
+{'saved': 'model_save/final_quantized_model/classifier_head.pt'}
+[Info] Loading model from: ./model_save/final_quantized_model
+[Info] Loading classifier head from: model_save/final_quantized_model/classifier_head.pt
+[Info] Loaded 3 test samples
+[Info] Attempting to load with 8-bit quantization...
+[Info] ✅ Loaded with 8-bit quantization
+[Info] ✅ Loaded 3-class classifier head (hidden_size=3584)
+[Info] Running inference...
+
+[Info] ✅ Saved submission to: ./sub/final_submission.csv
+[Info] Sample predictions:
+        id  winner_model_a  winner_model_b  winner_tie
+0   136060        0.229248        0.356578    0.414174
+1   211333        0.094339        0.378795    0.526867
+2  1233961        0.096683        0.331139    0.572178
+
+[Info] Mean probabilities:
+  model_a: 0.1401
+  model_b: 0.3555
+  tie:     0.5044
+[Step8] Wrote ./sub/final_submission.csv
