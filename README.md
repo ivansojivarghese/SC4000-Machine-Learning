@@ -1,31 +1,40 @@
 # Pipeline flow:
 
 Step 1: Post-pretrain large models on UT dataset [just LLaMA only]
+
 Step 2: Split Kaggle + 33k data into 5 folds [3 folds]
+
 Step 3: Train LLaMA3 70B & Qwen2 72B on folds [just LLaMA only]
+
 Step 4: Infer logits for all training data [just LLaMa only]
+
 Step 5: Distill logits into Gemma2-9B model [from LLaMa only]
 
 Step 6: Ensemble LoRA layers from 5 folds [TBA]
+
 Step 7: Quantize final model to 8-bit (GPTQ) [TBA]
+
 Step 8: Apply TTA during inference [TBA]
+
 Step 9: Evaluate CV and LB [TBA]
 
+---
 
 HF_token: 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
 
-
-SLURM Start-up Commands:
+## SLURM Start-up Commands:
 
 module load anaconda
+
 conda activate myenv
+
 cd ~/exported-assets_sc4000/
 
-SLURM Exit Commands:
+## SLURM Exit Commands:
 
 conda deactivate myenv
-exit
 
+exit
 
 ---
 
@@ -70,13 +79,9 @@ FOLDS=0 STUDENT_EPOCHS=2 sbatch step5_distill_student.sh
 OR
 
 FOLDS=0 sbatch step5_distill_student.sh
--
 FOLDS=1 sbatch step5_distill_student.sh
--
 FOLDS=2 sbatch step5_distill_student.sh
--
 FOLDS=3 sbatch step5_distill_student.sh
--
 FOLDS=4 sbatch step5_distill_student.sh
 
 ---
