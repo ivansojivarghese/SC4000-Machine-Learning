@@ -1,5 +1,5 @@
 #!/bin/bash
-# Step 2: Create and persist 5-fold splits to reuse across teachers and student.
+# Step 2: Create and persist 3-fold splits to reuse across teachers and student.
 # Usage:
 #   sbatch step2_make_folds.sh
 
@@ -23,7 +23,7 @@ cd ~/exported-assets_sc4000
 
 SCRATCH_BASE=${SCRATCH_BASE:-/scratch-shared/tc1proj005}
 FOLDS_LOCAL_DIR="data/processed_data"
-FOLDS_LOCAL_FILE="${FOLDS_LOCAL_DIR}/folds_5_seed42.json"
+FOLDS_LOCAL_FILE="${FOLDS_LOCAL_DIR}/folds_3_seed42.json"
 FOLDS_SCRATCH_DIR=${FOLDS_OUT_DIR:-"${SCRATCH_BASE}/folds"}
 mkdir -p "${FOLDS_LOCAL_DIR}" || true
 mkdir -p "${FOLDS_SCRATCH_DIR}" || true
@@ -59,14 +59,14 @@ else:
 if label_col is None:
     raise SystemExit('No labels/probs found in data/train.csv')
 
-skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+skf = StratifiedKFold(n_splits=3, shuffle=True, random_state=42)
 labels = df[label_col].astype(str).values
 folds = {}
 for k, (_, val_idx) in enumerate(skf.split(df, labels)):
     folds[k] = sorted(val_idx.tolist())
 
 os.makedirs('data/processed_data', exist_ok=True)
-out_local = os.environ.get('FOLDS_LOCAL_FILE','data/processed_data/folds_5_seed42.json')
+out_local = os.environ.get('FOLDS_LOCAL_FILE','data/processed_data/folds_3_seed42.json')
 with open(out_local,'w') as f:
         json.dump(folds, f)
 print(f'[Step2] wrote {out_local}')
@@ -108,7 +108,7 @@ for k, val_idx in folds.items():
     print(f"[Step2] Fold {k}: train rows={len(combined_train)} (kaggle={len(kaggle_train)} + extra={0 if extra_df is None else len(extra_df)}), val rows={len(kaggle_val)}")
 PY
 
-SCRATCH_FOLDS_FILE="${FOLDS_SCRATCH_DIR}/folds_5_seed42.json"
+SCRATCH_FOLDS_FILE="${FOLDS_SCRATCH_DIR}/folds_3_seed42.json"
 if [ -f "${FOLDS_LOCAL_FILE}" ]; then
     cp -f "${FOLDS_LOCAL_FILE}" "${SCRATCH_FOLDS_FILE}" && echo "[Step2] Copied folds JSON to ${SCRATCH_FOLDS_FILE}" || echo "[Step2][Warn] Failed to copy folds JSON to scratch (${SCRATCH_FOLDS_FILE})"
 else

@@ -47,7 +47,7 @@ ALPHA=${STUDENT_ALPHA:-0.7}
 MSE_W=${STUDENT_MSE_WEIGHT:-0.1}
 LABEL_SMOOTH=${STUDENT_LABEL_SMOOTH:-0.05}
 MAXLEN=${STUDENT_MAXLEN:-384}
-MAX_STEPS=${STUDENT_MAX_STEPS:-2600}
+MAX_STEPS=${STUDENT_MAX_STEPS:-5800}
 RESUME_CHECKPOINT=${RESUME_CHECKPOINT:-}
 OVERWRITE=${STUDENT_OVERWRITE:-0}
 
@@ -92,5 +92,14 @@ python -u student_train_distill_hf.py \
   --save_total_limit 1 \
   --logging_steps 50 \
   ${RESUME_CHECKPOINT:+--resume_from_checkpoint "$RESUME_CHECKPOINT"}
+
+# Export a standalone classifier head for this fold (useful for inference scripts)
+HEAD_PT="$OUTDIR/classifier_head.pt"
+if [ ! -f "$HEAD_PT" ]; then
+  echo "[Step5] Exporting classifier head to $HEAD_PT"
+  if ! python export_classifier_head.py --model-dir "$OUTDIR" --out "$HEAD_PT"; then
+    echo "[Step5][Warn] Failed to export classifier head for fold ${FOLD}. Continuing without standalone head."
+  fi
+fi
 
 echo "[Step5] Done fold $FOLD -> $OUTDIR"

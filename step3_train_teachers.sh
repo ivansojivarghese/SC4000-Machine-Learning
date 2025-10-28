@@ -63,11 +63,10 @@ PY
 
 KF=data/train.csv
 EXT=data/lmsys-33k-deduplicated.csv
-# Allow override: export FOLDS_JSON=/path/to/folds_5_seed42.json
-FOLDS_JSON=${FOLDS_JSON:-data/processed_data/folds_5_seed42.json}
+FOLDS_JSON=${FOLDS_JSON:-data/processed_data/folds_3_seed42.json}
 if [ ! -f "$FOLDS_JSON" ]; then
   # Try scratch locations
-  for cand in "${SCRATCH_BASE}/folds/folds_5_seed42.json" "${SCRATCH_BASE}/folds_5_seed42.json"; do
+  for cand in "${SCRATCH_BASE}/folds/folds_3_seed42.json" "${SCRATCH_BASE}/folds_3_seed42.json"; do
     if [ -f "$cand" ]; then
       echo "[Step3] Found folds file at scratch location: $cand"; FOLDS_JSON="$cand"; break
     fi
@@ -87,7 +86,7 @@ else
 import json, pandas as pd, os
 KF='data/train.csv'
 EXT='data/lmsys-33k-deduplicated.csv'
-FOLDS_JSON=os.environ.get('FOLDS_JSON','data/processed_data/folds_5_seed42.json')
+FOLDS_JSON=os.environ.get('FOLDS_JSON','data/processed_data/folds_3_seed42.json')
 import traceback, sys, time, shutil
 sel_spec = os.environ.get('TEACHER_FOLDS','all')
 start=time.time()
@@ -316,8 +315,8 @@ LORA_ALPHA=${TEACHER_LORA_ALPHA:-32}
 MAXLEN=${TEACHER_MAXLEN:-512}
 # For fastest training: use minimal accumulation and a larger per-device batch by default.
 # Override with TEACHER_GRAD_ACCUM / TEACHER_PER_DEVICE_BS if you hit OOM on your GPU.
-GRAD_ACCUM=${TEACHER_GRAD_ACCUM:-1}
-BS=${TEACHER_PER_DEVICE_BS:-16}
+GRAD_ACCUM=${TEACHER_GRAD_ACCUM:-8}
+BS=${TEACHER_PER_DEVICE_BS:-2}
 EPOCHS=${TEACHER_EPOCHS:-1}
 LR=${TEACHER_LR:-1e-5}
 SUBSET=${TEACHER_SUBSET_SIZE:--1}
