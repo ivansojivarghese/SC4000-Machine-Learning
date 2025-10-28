@@ -1,0 +1,62 @@
+[Step3] Resolving SCRATCH_BASE...
+[Step3] Using SCRATCH_BASE=/scratch-shared/tc1proj005
+[Step3] Hugging Face login succeeded (token provided).
+[Step3] Using Kaggle train: data/train.csv | External: data/lmsys-33k-deduplicated.csv
+[Step3][Prep] Starting fold CSV generation...
+[Step3][Prep] Loaded folds json with keys: ['0', '1', '2']
+[Step3][Prep] Filtering to folds ['1'] per TEACHER_FOLDS=1
+[Step3][Prep] Reading Kaggle train CSV...
+[Step3][Prep] Loaded Kaggle train df: (57477, 9)
+[Step3][Prep] Reading external CSV...
+[Step3][Prep] Loaded external df: (21187, 9)
+[Step3][Prep] Writing fold CSVs initially to /scratch-shared/tc1proj005/fold_data (will mirror to data/fold_data)
+[Step3][Prep][Fold 1] Start generation (val idx count=19159)
+[Step3][Prep][Fold 1] Built val set shape=(19159, 9)
+[Step3][Prep][Fold 1] Train subset shape=(38318, 9)
+[Step3][Prep][Fold 1] Combined shape=(59505, 9)
+[Step3][Prep][Fold 1] Composition: kaggle_train_rows=38318 external_rows=21187 expected_total=59505
+[Step3][Prep][Fold 1] Wrote to scratch: /scratch-shared/tc1proj005/fold_data
+[Step3][Prep][Fold 1] Wrote train=172.45MB val=61.15MB | 1/1 | 8.03s
+[Step3][Prep] Completed fold CSV generation in 10.9s
+[Step3][Sync] Copied data/fold_data/fold_0_train.csv -> /scratch-shared/tc1proj005/fold_data/
+[Step3][Sync] Copied data/fold_data/fold_0_val.csv -> /scratch-shared/tc1proj005/fold_data/
+[Step3][Sync] Copied data/fold_data/fold_1_train.csv -> /scratch-shared/tc1proj005/fold_data/
+[Step3][Sync] Copied data/fold_data/fold_1_val.csv -> /scratch-shared/tc1proj005/fold_data/
+[Step3][Sync] Copied data/fold_data/fold_2_train.csv -> /scratch-shared/tc1proj005/fold_data/
+[Step3][Sync] Copied data/fold_data/fold_2_val.csv -> /scratch-shared/tc1proj005/fold_data/
+[Step3] LLaMA base: /scratch-shared/tc1proj005/post_pretrain_llama3-8b_merged | tokenizer: meta-llama/Meta-Llama-3.1-8B | skip=0
+[Step3] Qwen base:  /scratch-shared/tc1proj005/post_pretrain_qwen2-72b_merged | tokenizer: Qwen/Qwen2.5-14B | skip=1
+[Step3] Teacher artifacts will be saved under: /scratch-shared/tc1proj005/folds
+[Step3] Selected folds: 1 (from TEACHER_FOLDS='1')
+[Step3] Root-level symlinks for fold models will be created (TEACHER_EXPOSE_ROOT=1).
+[Step3] LLaMA fold 1 train csv: data/fold_data/fold_1_train.csv
+[WARN] Could not fully align special token ids: 'NoneType' object has no attribute 'pad_token_id'
+[DEBUG] Trainable params: 41,955,328 / 4,057,231,360 (1.0341%)
+[WARN] load_dataset csv auto-infer failed: DatasetGenerationError: An error occurred while generating the dataset
+[WARN] Falling back to pandas coercion mode.
+[INFO] Fallback dataset constructed: 59505 rows | columns: ['id', 'model_a', 'model_b', 'prompt', 'response_a', 'response_b', 'winner_model_a', 'winner_model_b', 'winner_tie']
+[INFO] Subsetting training data: 20000 / 59505 examples (requested 20000)
+{'loss': 16.4663, 'grad_norm': 168.83432006835938, 'learning_rate': 9.366666666666668e-06, 'epoch': 0.01}
+{'loss': 2.5623, 'grad_norm': 119.81224060058594, 'learning_rate': 8.700000000000001e-06, 'epoch': 0.03}
+{'loss': 0.4567, 'grad_norm': 0.5502849817276001, 'learning_rate': 8.033333333333335e-06, 'epoch': 0.04}
+{'loss': 0.115, 'grad_norm': 0.0007047165418043733, 'learning_rate': 7.3666666666666676e-06, 'epoch': 0.05}
+{'loss': 0.034, 'grad_norm': 8.694153785705566, 'learning_rate': 6.700000000000001e-06, 'epoch': 0.07}
+{'loss': 0.0111, 'grad_norm': 2.5379962607985362e-05, 'learning_rate': 6.033333333333335e-06, 'epoch': 0.08}
+{'loss': 0.0001, 'grad_norm': 0.0003774178330786526, 'learning_rate': 5.366666666666666e-06, 'epoch': 0.09}
+{'loss': 0.0016, 'grad_norm': 0.0006180797354318202, 'learning_rate': 4.7e-06, 'epoch': 0.1}
+{'loss': 0.0002, 'grad_norm': 0.00046062187175266445, 'learning_rate': 4.033333333333333e-06, 'epoch': 0.12}
+{'loss': 0.0127, 'grad_norm': 0.019269876182079315, 'learning_rate': 3.366666666666667e-06, 'epoch': 0.13}
+{'loss': 0.0006, 'grad_norm': 0.0015411674976348877, 'learning_rate': 2.7000000000000004e-06, 'epoch': 0.14}
+{'loss': 0.0003, 'grad_norm': 0.0022468161769211292, 'learning_rate': 2.0333333333333335e-06, 'epoch': 0.16}
+{'loss': 0.0011, 'grad_norm': 0.05489165335893631, 'learning_rate': 1.3666666666666668e-06, 'epoch': 0.17}
+{'loss': 0.0001, 'grad_norm': 0.00026019304641522467, 'learning_rate': 7.000000000000001e-07, 'epoch': 0.18}
+{'loss': 0.0005, 'grad_norm': 0.00020880569354631007, 'learning_rate': 3.333333333333334e-08, 'epoch': 0.2}
+{'train_runtime': 14683.3082, 'train_samples_per_second': 0.327, 'train_steps_per_second': 0.02, 'train_loss': 1.3108462697267533, 'epoch': 0.2}
+[INFO] Wrote training_summary.json
+[Merge] Saving merged model to /scratch-shared/tc1proj005/folds/llama_fold_1
+[Step3][OK] Sharded safetensors detected in LLaMA merged fold 1 (/scratch-shared/tc1proj005/folds/llama_fold_1)
+[Step3][Info] LLaMA merged fold 1 shard count: 16
+[Step3][OK] Weights present (sharded) in LLaMA merged fold 1 (/scratch-shared/tc1proj005/folds/llama_fold_1)
+[Step3][Manifest] Updated /scratch-shared/tc1proj005/folds/manifest.json with llama fold 1
+[Step3][Skip] Qwen fold 1 due to SKIP_QWEN=1
+[Step3] Done
