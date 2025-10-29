@@ -9,6 +9,7 @@ Student training with knowledge distillation (KL + CE + optional MSE) using Hugg
 """
 
 from typing import Dict, List, Optional, Tuple
+import json
 import os
 import numpy as np
 import torch
@@ -424,7 +425,6 @@ def train_student_distill(
     dataloader_num_workers: int = 0,
     num_folds: int = 1,
     fold_idx: int = 0,
-    # Quantization / PEFT
     load_in_4bit: bool = False,
     load_in_8bit: bool = False,
     use_lora: bool = False,
@@ -432,13 +432,13 @@ def train_student_distill(
     lora_alpha: int = 16,
     lora_dropout: float = 0.05,
     max_steps: Optional[int] = None,
-    # Checkpointing / resume controls
     resume_from_checkpoint: Optional[str] = None,
     evaluation_strategy: str = 'epoch',
     save_strategy: str = 'epoch',
     save_steps: Optional[int] = None,
     save_total_limit: int = 1,
     logging_steps: int = 20,
+    calibration: Optional[str] = None,
 ):
     # Validate inputs
     if not teacher_logits and not (teacher_oof_table and fold_train_csv):
@@ -565,6 +565,8 @@ def train_student_distill(
     # Load and align teacher probs
     if teacher_logits:
         teacher_probs = average_teacher_probs(teacher_logits, num_classes=3, T_soft=T_soft)
+        a, b = load_calibration(calibration)
+        teacher_probs = apply_calibration(teacher_probs, a, b)
         # If probs look like logits (sum not ~1), they were softmaxed inside average_teacher_probs
         if fold_train_csv:
             # Expect exact alignment
@@ -579,6 +581,8 @@ def train_student_distill(
         # Align via OOF
         n_rows = len(ds)
         teacher_probs, present_mask = _teacher_from_oof(teacher_oof_table, fold_idx, teacher_model_name, n_rows)
+        a, b = load_calibration(calibration)
+        teacher_probs = apply_calibration(teacher_probs, a, b)
         logger.info(f"[Distill] Loaded OOF teacher probs for fold={fold_idx}, model={teacher_model_name} -> present={present_mask.sum()}/{n_rows}")
     else:
         raise ValueError('Invalid teacher specification')
@@ -804,6 +808,32 @@ def train_student_distill(
     return metrics
 
 
+def load_calibration(calib_path):
+    if calib_path is None:
+        return None, None
+    if calib_path.endswith('.npz'):
+        params = np.load(calib_path)
+        a = params['a']
+        b = params['b']
+    elif calib_path.endswith('.json'):
+        with open(calib_path) as f:
+            params = json.load(f)
+        a = np.array(params['a'])
+        b = np.array(params['b'])
+    else:
+        a = b = None
+    return a, b
+
+
+def apply_calibration(logits, a, b):
+    if a is not None and b is not None:
+        logits = logits.astype(np.float32)
+        a = a.astype(np.float32)
+        b = b.astype(np.float32)
+        return logits * a + b
+    return logits.astype(np.float32)
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Train 3-class student with knowledge distillation')
     parser.add_argument('--train_csv', type=str, default='./data/train.csv')
@@ -851,6 +881,7 @@ if __name__ == '__main__':
     parser.add_argument('--save_steps', type=int, default=None)
     parser.add_argument('--save_total_limit', type=int, default=1)
     parser.add_argument('--logging_steps', type=int, default=20)
+    parser.add_argument('--calibration', type=str, default=None, help='Path to vector scaling calibration file (.json or .npz)')
 
     args = parser.parse_args()
 
@@ -886,7 +917,7 @@ if __name__ == '__main__':
         dataloader_num_workers=args.dataloader_num_workers,
         num_folds=args.num_folds,
         fold_idx=args.fold_idx,
-    max_steps=args.max_steps,
+        max_steps=args.max_steps,
         load_in_4bit=args.load_in_4bit,
         load_in_8bit=args.load_in_8bit,
         use_lora=args.use_lora,
@@ -899,5 +930,6 @@ if __name__ == '__main__':
         save_steps=args.save_steps,
         save_total_limit=args.save_total_limit,
         logging_steps=args.logging_steps,
+        calibration=args.calibration,
     )
     print({'eval': metrics})

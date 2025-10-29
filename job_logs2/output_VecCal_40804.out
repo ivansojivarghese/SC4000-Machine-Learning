@@ -1,0 +1,10 @@
+[vector_calib] Fold file llama_fold_0_val_logprobs.pt | rows=19159
+[vector_calib] Fold file llama_fold_1_val_logprobs.pt | rows=19159
+[vector_calib] Fold file llama_fold_2_val_logprobs.pt | rows=19159
+[vector_calib] Total rows across folds: 57477
+Optimal scale factors (a): [-5.85131794e-05 -5.65687448e-05 -4.71649875e-05]
+Optimal biases (b): [-0.00011297 -0.00012729  0.0002403 ]
+Final NLL: 1.0952304907293526
+Saved to calibration/vector_scaling_params.npz
+Saved to calibration/vector_scaling_params.json
+[VecCal] Saved calibration artifacts under calibration

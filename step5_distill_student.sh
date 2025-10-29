@@ -31,6 +31,7 @@ export TOKENIZERS_PARALLELISM=false
 export HF_DATASETS_CACHE="${PWD}/.hf_cache"
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
+
 echo "[Step5] Distilling fold ${FOLD} using LLaMA-only OOF probs"
 
 OOF_PATH=${INFER_OOF_TABLE:-model_save/teacher_logits/oof_probs.parquet}
@@ -47,9 +48,12 @@ ALPHA=${STUDENT_ALPHA:-0.7}
 MSE_W=${STUDENT_MSE_WEIGHT:-0.1}
 LABEL_SMOOTH=${STUDENT_LABEL_SMOOTH:-0.05}
 MAXLEN=${STUDENT_MAXLEN:-384}
-MAX_STEPS=${STUDENT_MAX_STEPS:-5800}
+MAX_STEPS=${STUDENT_MAX_STEPS:-1500}
 RESUME_CHECKPOINT=${RESUME_CHECKPOINT:-}
 OVERWRITE=${STUDENT_OVERWRITE:-0}
+
+# Calibration file (update path if needed)
+CALIBRATION_FILE="calibration/vector_scaling_params.json"
 
 # Optional fresh start: wipe OUTDIR when OVERWRITE=1 and not resuming
 if [ "$OVERWRITE" = "1" ] && [ -d "$OUTDIR" ] && [ -z "${RESUME_CHECKPOINT}" ]; then
@@ -91,6 +95,7 @@ python -u student_train_distill_hf.py \
   --save_strategy epoch \
   --save_total_limit 1 \
   --logging_steps 50 \
+  --calibration "$CALIBRATION_FILE" \
   ${RESUME_CHECKPOINT:+--resume_from_checkpoint "$RESUME_CHECKPOINT"}
 
 # Export a standalone classifier head for this fold (useful for inference scripts)
