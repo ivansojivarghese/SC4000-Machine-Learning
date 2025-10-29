@@ -48,7 +48,7 @@ ALPHA=${STUDENT_ALPHA:-0.7}
 MSE_W=${STUDENT_MSE_WEIGHT:-0.05}
 LABEL_SMOOTH=${STUDENT_LABEL_SMOOTH:-0.05}
 MAXLEN=${STUDENT_MAXLEN:-384}
-MAX_STEPS=${STUDENT_MAX_STEPS:-1500}
+MAX_STEPS=${STUDENT_MAX_STEPS:-1000}
 RESUME_CHECKPOINT=${RESUME_CHECKPOINT:-}
 OVERWRITE=${STUDENT_OVERWRITE:-0}
 
@@ -95,7 +95,7 @@ python -u student_train_distill_hf.py \
   --save_strategy epoch \
   --save_total_limit 1 \
   --logging_steps 50 \
-  --calibration "$CALIBRATION_FILE" \
+  # --calibration "$CALIBRATION_FILE" \
   ${RESUME_CHECKPOINT:+--resume_from_checkpoint "$RESUME_CHECKPOINT"}
 
 # Export a standalone classifier head for this fold (useful for inference scripts)

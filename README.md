@@ -18,6 +18,8 @@ Step 7: Quantize final model to 8-bit (GPTQ) [TBA]
 
 Step 8: Apply TTA during inference [TBA]
 
+Step 8.5: TTA Symmetrization Post-processing [TBA]
+
 Step 9: Evaluate CV and LB [TBA]
 
 ---
@@ -76,7 +78,7 @@ INFER_FOLDS=2 INFER_MODELS=llama INFER_PREFER_LORA=1 INFER_LLAMA_SUBSET=15000-20
 
 ## Step 4.5:
 
-sbatch calibrate_vector_scaling.sh
+sbatch calibrate_vector_scaling.sh (OPTIONAL TO RUN)
 
 ---
 
@@ -105,6 +107,10 @@ sbatch step7_quantize_gptq.sh
 ## Step 8:
 
 sbatch step8_infer_tta.sh
+
+---
+
+## Step 8.5: TTA Symmetrization Post-processing
 
 ---
 

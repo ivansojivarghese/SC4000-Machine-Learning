@@ -565,8 +565,8 @@ def train_student_distill(
     # Load and align teacher probs
     if teacher_logits:
         teacher_probs = average_teacher_probs(teacher_logits, num_classes=3, T_soft=T_soft)
-        a, b = load_calibration(calibration)
-        teacher_probs = apply_calibration(teacher_probs, a, b)
+        # a, b = load_calibration(calibration)
+        # teacher_probs = apply_calibration(teacher_probs, a, b)
         # If probs look like logits (sum not ~1), they were softmaxed inside average_teacher_probs
         if fold_train_csv:
             # Expect exact alignment
@@ -581,8 +581,8 @@ def train_student_distill(
         # Align via OOF
         n_rows = len(ds)
         teacher_probs, present_mask = _teacher_from_oof(teacher_oof_table, fold_idx, teacher_model_name, n_rows)
-        a, b = load_calibration(calibration)
-        teacher_probs = apply_calibration(teacher_probs, a, b)
+        # a, b = load_calibration(calibration)
+        # teacher_probs = apply_calibration(teacher_probs, a, b)
         logger.info(f"[Distill] Loaded OOF teacher probs for fold={fold_idx}, model={teacher_model_name} -> present={present_mask.sum()}/{n_rows}")
     else:
         raise ValueError('Invalid teacher specification')
@@ -808,30 +808,32 @@ def train_student_distill(
     return metrics
 
 
-def load_calibration(calib_path):
-    if calib_path is None:
-        return None, None
-    if calib_path.endswith('.npz'):
-        params = np.load(calib_path)
-        a = params['a']
-        b = params['b']
-    elif calib_path.endswith('.json'):
-        with open(calib_path) as f:
-            params = json.load(f)
-        a = np.array(params['a'])
-        b = np.array(params['b'])
-    else:
-        a = b = None
-    return a, b
+## Calibration code commented out
+# def load_calibration(calib_path):
+#     if calib_path is None:
+#         return None, None
+#     if calib_path.endswith('.npz'):
+#         params = np.load(calib_path)
+#         a = params['a']
+#         b = params['b']
+#     elif calib_path.endswith('.json'):
+#         with open(calib_path) as f:
+#             params = json.load(f)
+#         a = np.array(params['a'])
+#         b = np.array(params['b'])
+#     else:
+#         a = b = None
+#     return a, b
 
 
-def apply_calibration(logits, a, b):
-    if a is not None and b is not None:
-        logits = logits.astype(np.float32)
-        a = a.astype(np.float32)
-        b = b.astype(np.float32)
-        return logits * a + b
-    return logits.astype(np.float32)
+## Calibration code commented out
+# def apply_calibration(logits, a, b):
+#     if a is not None and b is not None:
+#         logits = logits.astype(np.float32)
+#         a = a.astype(np.float32)
+#         b = b.astype(np.float32)
+#         return logits * a + b
+#     return logits.astype(np.float32)
 
 
 if __name__ == '__main__':
