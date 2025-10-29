@@ -82,10 +82,6 @@ sbatch calibrate_vector_scaling.sh
 
 ## Step 5:
 
-FOLDS=0 STUDENT_EPOCHS=2 sbatch step5_distill_student.sh
-
-OR
-
 FOLDS=0 sbatch step5_distill_student.sh
 
 FOLDS=1 sbatch step5_distill_student.sh
