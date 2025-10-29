@@ -8,6 +8,8 @@ Step 3: Train LLaMA3 70B & Qwen2 72B on folds [just LLaMA only]
 
 Step 4: Infer logits for all training data [just LLaMa only]
 
+Step 4.5: Calibrate logits with vector scaling [just LLaMa only]
+
 Step 5: Distill logits into Gemma2-9B model [from LLaMa only]
 
 Step 6: Ensemble LoRA layers from 5 folds [TBA]
@@ -62,13 +64,19 @@ TEACHER_SUBSET_SIZE=20000 TEACHER_MAX_STEPS=300 TEACHER_FOLDS="2" SKIP_QWEN=1 sb
 
 ---
 
-## Step 4: [CURRENT]
+## Step 4:
 
 INFER_FOLDS=0 INFER_MODELS=llama INFER_PREFER_LORA=1 INFER_LLAMA_SUBSET=15000-20000 INFER_LOGPROB_BATCH=8 INFER_PROGRESS_EVERY=5 sbatch step4_infer_teacher_logits.sh 
 
 INFER_FOLDS=1 INFER_MODELS=llama INFER_PREFER_LORA=1 INFER_LLAMA_SUBSET=15000-20000 INFER_LOGPROB_BATCH=8 INFER_PROGRESS_EVERY=5 sbatch step4_infer_teacher_logits.sh
 
 INFER_FOLDS=2 INFER_MODELS=llama INFER_PREFER_LORA=1 INFER_LLAMA_SUBSET=15000-20000 INFER_LOGPROB_BATCH=8 INFER_PROGRESS_EVERY=5 sbatch step4_infer_teacher_logits.sh
+
+---
+
+## Step 4.5:
+
+sbatch calibrate_vector_scaling.sh
 
 ---
 
