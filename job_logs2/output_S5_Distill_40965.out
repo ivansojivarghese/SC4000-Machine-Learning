@@ -1,0 +1,26 @@
+[Step5] Distilling fold 1 using LLaMA-only OOF probs
+{'loss': 2.0894, 'grad_norm': 9.07582950592041, 'learning_rate': 4.0833333333333334e-05, 'epoch': 0.03}
+{'loss': 1.7493, 'grad_norm': 16.077964782714844, 'learning_rate': 4.792553191489362e-05, 'epoch': 0.06}
+{'loss': 1.4881, 'grad_norm': 8.85181713104248, 'learning_rate': 4.526595744680851e-05, 'epoch': 0.09}
+{'loss': 1.3762, 'grad_norm': 2.72664475440979, 'learning_rate': 4.2606382978723406e-05, 'epoch': 0.12}
+{'loss': 1.305, 'grad_norm': 3.284581422805786, 'learning_rate': 3.99468085106383e-05, 'epoch': 0.15}
+{'loss': 1.3038, 'grad_norm': 21.080041885375977, 'learning_rate': 3.728723404255319e-05, 'epoch': 0.18}
+{'loss': 1.3184, 'grad_norm': 7.026211261749268, 'learning_rate': 3.462765957446809e-05, 'epoch': 0.21}
+{'loss': 1.2936, 'grad_norm': 6.702735424041748, 'learning_rate': 3.1968085106382976e-05, 'epoch': 0.24}
+{'loss': 1.2755, 'grad_norm': 4.4795966148376465, 'learning_rate': 2.9308510638297876e-05, 'epoch': 0.27}
+{'loss': 1.2486, 'grad_norm': 8.916747093200684, 'learning_rate': 2.664893617021277e-05, 'epoch': 0.3}
+{'loss': 1.2513, 'grad_norm': 7.108099937438965, 'learning_rate': 2.398936170212766e-05, 'epoch': 0.33}
+{'loss': 1.2266, 'grad_norm': 5.3622212409973145, 'learning_rate': 2.1329787234042554e-05, 'epoch': 0.36}
+{'loss': 1.238, 'grad_norm': 9.0596284866333, 'learning_rate': 1.867021276595745e-05, 'epoch': 0.39}
+{'loss': 1.2122, 'grad_norm': 16.76982879638672, 'learning_rate': 1.6010638297872342e-05, 'epoch': 0.42}
+{'loss': 1.2507, 'grad_norm': 11.911545753479004, 'learning_rate': 1.3351063829787237e-05, 'epoch': 0.45}
+{'loss': 1.2024, 'grad_norm': 3.604839324951172, 'learning_rate': 1.0691489361702128e-05, 'epoch': 0.48}
+{'loss': 1.2093, 'grad_norm': 4.572177886962891, 'learning_rate': 8.031914893617022e-06, 'epoch': 0.51}
+{'loss': 1.214, 'grad_norm': 4.7629008293151855, 'learning_rate': 5.372340425531915e-06, 'epoch': 0.54}
+{'loss': 1.2007, 'grad_norm': 9.052522659301758, 'learning_rate': 2.7127659574468088e-06, 'epoch': 0.57}
+{'loss': 1.1494, 'grad_norm': 6.137238502502441, 'learning_rate': 5.319148936170213e-08, 'epoch': 0.6}
+{'train_runtime': 14623.9535, 'train_samples_per_second': 2.188, 'train_steps_per_second': 0.068, 'train_loss': 1.3301315078735352, 'epoch': 0.6}
+{'eval': {'eval_loss': 0.2955223619937897, 'eval_log_loss': 0.9721381329641882, 'eval_accuracy': 0.5190724248025542, 'eval_runtime': 811.8375, 'eval_samples_per_second': 7.33, 'eval_steps_per_second': 0.916, 'epoch': 0.5974607916355489}}
+[Step5] Exporting classifier head to model_save/distilled_gemma2-9b_fold_1/classifier_head.pt
+{'saved': 'model_save/distilled_gemma2-9b_fold_1/classifier_head.pt'}
+[Step5] Done fold 1 -> model_save/distilled_gemma2-9b_fold_1

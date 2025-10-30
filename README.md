@@ -4,6 +4,8 @@ Step 1: Post-pretrain large models on UT dataset [just LLaMA only]
 
 Step 2: Split Kaggle + 33k data into 5 folds [3 folds]
 
+Step 2.5: Remove argmax samples from folds [3 folds]
+
 Step 3: Train LLaMA3 70B & Qwen2 72B on folds [just LLaMA only]
 
 Step 4: Infer logits for all training data [just LLaMa only]
@@ -53,6 +55,12 @@ RUN_STAGE=llama SCRATCH_BASE=/scratch-shared/tc1proj005 sbatch step1_post_pretra
 ## Step 2:
 
 sbatch step2_make_folds.sh
+
+---
+
+## Step 2.5: 
+
+sbatch remove_argmax_from_folds.sh 
 
 ---
 
