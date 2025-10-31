@@ -30,7 +30,7 @@ else
   cd "$(dirname "$0")"
 fi
 
-HEAD_DIR=${HEAD_DIR:-model_save/final_quantized_model}
+HEAD_DIR=${HEAD_DIR:-model_save/final_merged_model}
 HEAD_OUT=${HEAD_OUT:-${HEAD_DIR}/classifier_head.pt}
 if [ ! -f "$HEAD_OUT" ]; then
   if ! python export_classifier_head.py \
@@ -41,7 +41,7 @@ if [ ! -f "$HEAD_OUT" ]; then
   fi
 fi
 
-MODEL_DIR=${MODEL_DIR:-./model_save/final_quantized_model}
+MODEL_DIR=${MODEL_DIR:-./model_save/final_merged_model}
 TEST_CSV=${TEST_CSV:-./data/test.csv}
 OUT_SUB=${OUT_SUB:-./sub/final_submission.csv}
 CALIB_JSON=${CALIB_JSON:-${HEAD_DIR}/calibration.json}

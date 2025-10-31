@@ -40,43 +40,31 @@ out_dir = os.environ.get('OUT_LORA','model_save/avg_lora')
 os.makedirs(out_dir, exist_ok=True)
 
 adapters = []
-
-config_paths = []
+config_src = None
 for k in folds:
 	fold_dir = f"{pref}{k}"
 	cand = os.path.join(fold_dir, "adapter_model.safetensors")
 	if os.path.isfile(cand):
 		adapters.append(cand)
 		cfg = os.path.join(fold_dir, 'adapter_config.json')
-		if os.path.isfile(cfg):
-			config_paths.append(cfg)
+		if config_src is None and os.path.isfile(cfg):
+			config_src = cfg
 	else:
+		# try peft default
 		alt = os.path.join(fold_dir, "adapter_model.bin")
 		if os.path.isfile(alt):
 			adapters.append(alt)
 			cfg = os.path.join(fold_dir, 'adapter_config.json')
-			if os.path.isfile(cfg):
-				config_paths.append(cfg)
+			if config_src is None and os.path.isfile(cfg):
+				config_src = cfg
 		else:
 			print(f"[Step6][Warn] Missing adapter for fold {k}: {cand}")
 if not adapters:
 	raise SystemExit("No fold adapters found to average.")
 
-# Just copy the first available config file from the selected folds
-if config_paths:
-	dst = os.path.join(out_dir, 'adapter_config.json')
-	shutil.copy2(config_paths[0], dst)
-	print(f"[Step6] Copied adapter_config.json from {config_paths[0]} -> {dst}")
-else:
-	print("[Step6][Warn] No adapter_config.json found in any fold dir; merge may fail. Provide a config or re-run Step5 with PEFT saving.")
-
-avg = {k: (v/len(adapters)).to(v.dtype) for k,v in acc.items()}
-
-print(f"[Step6] Linear merge: averaging LoRA deltas from folds: {folds}")
 print(f"[Step6] Found {len(adapters)} adapters: {adapters}")
 acc = {}
-for i, p in enumerate(adapters):
-	print(f"[Step6][Debug] Loading adapter {i+1}/{len(adapters)}: {p}")
+for p in adapters:
 	if p.endswith('.safetensors'):
 		state = load_file(p)
 	else:
@@ -85,14 +73,22 @@ for i, p in enumerate(adapters):
 		if not torch.is_floating_point(v):
 			continue
 		acc[k] = acc.get(k, torch.zeros_like(v)) + v
-print(f"[Step6][Debug] Summed all adapter weights. Now dividing by {len(adapters)} for linear average.")
+
 avg = {k: (v/len(adapters)).to(v.dtype) for k,v in acc.items()}
 save_path = os.path.join(out_dir, 'adapter_model.safetensors')
 save_file(avg, save_path)
 print(f"[Step6] Wrote averaged adapter -> {save_path}")
 
-
-# No config copying; only perform linear average of LoRA adapters
+# Ensure adapter_config.json is present so PEFT can load locally
+if config_src and os.path.isfile(config_src):
+	dst = os.path.join(out_dir, 'adapter_config.json')
+	try:
+		shutil.copy2(config_src, dst)
+		print(f"[Step6] Copied adapter_config.json from {config_src} -> {dst}")
+	except Exception as e:
+		print(f"[Step6][Warn] Failed to copy adapter_config.json: {e}")
+else:
+	print("[Step6][Warn] No adapter_config.json found in any fold dir; merge may fail. Provide a config or re-run Step5 with PEFT saving.")
 PY
 
 echo "[Step6] Merging averaged LoRA into base: $BASE_MODEL -> $OUT_MERGED"
