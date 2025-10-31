@@ -48,9 +48,31 @@ ALPHA=${STUDENT_ALPHA:-0.7}
 MSE_W=${STUDENT_MSE_WEIGHT:-0.05}
 LABEL_SMOOTH=${STUDENT_LABEL_SMOOTH:-0.05}
 MAXLEN=${STUDENT_MAXLEN:-384}
-MAX_STEPS=${STUDENT_MAX_STEPS:-1000}
+# Leave STUDENT_MAX_STEPS unset to run purely by epochs; set to a positive int to cap by steps
+MAX_STEPS=${STUDENT_MAX_STEPS:-2000}
 RESUME_CHECKPOINT=${RESUME_CHECKPOINT:-}
 OVERWRITE=${STUDENT_OVERWRITE:-0}
+# Early stopping patience (in evaluation events). With evaluation_strategy=epoch, this is epochs without improvement.
+ES_PATIENCE=${STUDENT_ES_PATIENCE:-1}
+
+# Evaluation cadence (steps-based by default for live logs). Override via env if you prefer epoch-based.
+EVAL_STRATEGY=${STUDENT_EVAL_STRATEGY:-steps}   # steps | epoch | no
+EVAL_STEPS=${STUDENT_EVAL_STEPS:-200}           # only used when steps strategy
+# Saving cadence (align saves with evals by default when using steps)
+if [ "$EVAL_STRATEGY" = "steps" ]; then
+  SAVE_STRATEGY=${STUDENT_SAVE_STRATEGY:-steps}
+  SAVE_STEPS=${STUDENT_SAVE_STEPS:-$EVAL_STEPS}
+else
+  SAVE_STRATEGY=${STUDENT_SAVE_STRATEGY:-epoch}
+  SAVE_STEPS=${STUDENT_SAVE_STEPS:-}
+fi
+# Logging frequency (print more often during steps-based evals)
+if [ "$EVAL_STRATEGY" = "steps" ]; then
+  LOGGING_STEPS=$(( EVAL_STEPS/2 ))
+  if [ "$LOGGING_STEPS" -lt 10 ]; then LOGGING_STEPS=10; fi
+else
+  LOGGING_STEPS=${STUDENT_LOGGING_STEPS:-50}
+fi
 
 # Calibration file (update path if needed)
 CALIBRATION_FILE="calibration/vector_scaling_params.json"
@@ -70,6 +92,15 @@ if [ ! -f "$OOF_PATH" ]; then
   exit 4
 fi
 
+# Informative log: epoch-driven vs step-capped
+if [ -z "$MAX_STEPS" ]; then
+  echo "[Step5] Epoch-driven training: num_epochs=$EPOCHS (no --max_steps passed)"
+else
+  echo "[Step5] Step-capped training: --max_steps=$MAX_STEPS will limit total steps (overrides epochs)"
+fi
+
+echo "[Step5] Eval strategy=$EVAL_STRATEGY ${EVAL_STRATEGY=steps:+(eval_steps=$EVAL_STEPS)} | Save strategy=$SAVE_STRATEGY ${SAVE_STEPS:+(save_steps=$SAVE_STEPS)} | logging_steps=$LOGGING_STEPS"
+
 python -u student_train_distill_hf.py \
   --fold_train_csv "$FOLD_TRAIN_CSV" \
   --teacher_oof_table "$OOF_PATH" \
@@ -78,7 +109,7 @@ python -u student_train_distill_hf.py \
   --model_name "$STUDENT_MODEL" \
   --learning_rate $LR \
   --num_epochs $EPOCHS \
-  --max_steps $MAX_STEPS \
+  ${MAX_STEPS:+--max_steps $MAX_STEPS} \
   --per_device_train_batch_size $BATCH \
   --per_device_eval_batch_size $BATCH \
   --gradient_accumulation_steps $ACCUM \
@@ -87,14 +118,17 @@ python -u student_train_distill_hf.py \
   --mse_weight $MSE_W \
   --label_smoothing $LABEL_SMOOTH \
   --max_length $MAXLEN \
+  --early_stopping_patience $ES_PATIENCE \
   --fp16 --gradient_checkpointing --use_fast_tokenizer \
   --load_in_4bit --use_lora --lora_r 16 --lora_alpha 32 --lora_dropout 0.05 \
   --dataloader_num_workers 4 \
-  --num_folds 5 --fold_idx $FOLD \
-  --evaluation_strategy epoch \
-  --save_strategy epoch \
+  --num_folds 3 --fold_idx $FOLD \
+  --evaluation_strategy "$EVAL_STRATEGY" \
+  ${EVAL_STEPS:+--eval_steps $EVAL_STEPS} \
+  --save_strategy "$SAVE_STRATEGY" \
+  ${SAVE_STEPS:+--save_steps $SAVE_STEPS} \
   --save_total_limit 1 \
-  --logging_steps 50 \
+  --logging_steps $LOGGING_STEPS \
   # --calibration "$CALIBRATION_FILE" \
   ${RESUME_CHECKPOINT:+--resume_from_checkpoint "$RESUME_CHECKPOINT"}
 

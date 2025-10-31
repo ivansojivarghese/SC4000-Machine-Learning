@@ -438,6 +438,7 @@ def train_student_distill(
     save_steps: Optional[int] = None,
     save_total_limit: int = 1,
     logging_steps: int = 20,
+    eval_steps: Optional[int] = None,
     calibration: Optional[str] = None,
 ):
     # Validate inputs
@@ -648,6 +649,9 @@ def train_student_distill(
         base_kwargs['save_strategy'] = save_strategy
         if save_strategy == 'steps' and ('save_steps' in allowed) and (save_steps is not None):
             base_kwargs['save_steps'] = int(save_steps)
+        # Optional step-based evaluation frequency
+        if evaluation_strategy == 'steps' and ('eval_steps' in allowed) and (eval_steps is not None):
+            base_kwargs['eval_steps'] = int(eval_steps)
     if 'group_by_length' not in allowed:
         base_kwargs.pop('group_by_length', None)
     if 'report_to' not in allowed:
@@ -723,12 +727,68 @@ def train_student_distill(
             ep = state.epoch if state.epoch is not None else 0
             logger.info(f"[Distill] Epoch {int(ep)} finished in {dt:.2f}s | examples/sec: {ex_per_sec:.2f} | tokens/sec: {tok_per_sec:.2f}")
 
+    # Evaluation metrics logger (prints and appends JSONL)
+    class EvalLoggerCallback(TrainerCallback):
+        def __init__(self, out_dir: str):
+            self.out_dir = out_dir
+            self.prev = None
+            try:
+                os.makedirs(out_dir, exist_ok=True)
+            except Exception:
+                pass
+
+        def on_evaluate(self, args, state, control, metrics=None, **kwargs):
+            m = metrics or {}
+            step = int(getattr(state, 'global_step', 0) or 0)
+            epoch = getattr(state, 'epoch', None)
+            ev_loss = m.get('eval_loss', None)
+            ev_logloss = m.get('eval_log_loss', m.get('log_loss', None))
+            acc = m.get('eval_accuracy', m.get('accuracy', None))
+            # Build concise line
+            parts = [f"[Distill][Eval] step={step}"]
+            if epoch is not None:
+                parts.append(f"epoch={epoch:.2f}")
+            if ev_loss is not None:
+                parts.append(f"eval_loss={ev_loss:.4f}")
+            if ev_logloss is not None:
+                # Compute delta vs previous eval_logloss if available
+                delta = None
+                if isinstance(self.prev, dict) and ('eval_log_loss' in self.prev or 'log_loss' in self.prev):
+                    prev_ll = self.prev.get('eval_log_loss', self.prev.get('log_loss'))
+                    if prev_ll is not None:
+                        try:
+                            delta = float(ev_logloss) - float(prev_ll)
+                        except Exception:
+                            delta = None
+                if delta is not None:
+                    parts.append(f"eval_log_loss={float(ev_logloss):.4f} (Δ {delta:+.4f})")
+                else:
+                    parts.append(f"eval_log_loss={float(ev_logloss):.4f}")
+            if acc is not None:
+                parts.append(f"acc={float(acc):.4f}")
+            print(" ".join(parts))
+
+            # Append JSONL
+            rec = dict(step=step, epoch=float(epoch) if epoch is not None else None)
+            if ev_loss is not None:
+                rec['eval_loss'] = float(ev_loss)
+            if ev_logloss is not None:
+                rec['eval_log_loss'] = float(ev_logloss)
+            if acc is not None:
+                rec['eval_accuracy'] = float(acc)
+            try:
+                with open(os.path.join(self.out_dir, 'eval_history.jsonl'), 'a') as f:
+                    f.write(json.dumps(rec) + "\n")
+            except Exception:
+                pass
+            self.prev = m
+
     # Optional per-epoch temperature schedule (adjusts T_soft used in KL and MSE)
     temps = _parse_temp_schedule(temp_schedule, num_epochs, T_soft)
 
     # Build callbacks conditionally: EarlyStopping requires an eval strategy.
     support_eval_strategy = 'evaluation_strategy' in allowed
-    callbacks_list = [ThroughputLoggerCallback(train_tok)]
+    callbacks_list = [ThroughputLoggerCallback(train_tok), EvalLoggerCallback(output_dir)]
     if support_eval_strategy and early_stopping_patience and early_stopping_patience > 0:
         callbacks_list.insert(0, EarlyStoppingCallback(early_stopping_patience=early_stopping_patience))
 
@@ -883,6 +943,7 @@ if __name__ == '__main__':
     parser.add_argument('--save_steps', type=int, default=None)
     parser.add_argument('--save_total_limit', type=int, default=1)
     parser.add_argument('--logging_steps', type=int, default=20)
+    parser.add_argument('--eval_steps', type=int, default=None, help='Evaluate every N steps when evaluation_strategy=steps')
     parser.add_argument('--calibration', type=str, default=None, help='Path to vector scaling calibration file (.json or .npz)')
 
     args = parser.parse_args()
@@ -932,6 +993,7 @@ if __name__ == '__main__':
         save_steps=args.save_steps,
         save_total_limit=args.save_total_limit,
         logging_steps=args.logging_steps,
+        eval_steps=args.eval_steps,
         calibration=args.calibration,
     )
     print({'eval': metrics})

@@ -30,6 +30,8 @@ def train_lora(
     subset_size: int = None,
     per_device_batch: int = 1,
     max_steps: int = -1,
+    resume_from_checkpoint: str = "auto",
+    save_total_limit: int = 2,
 ):
     os.makedirs(output_dir, exist_ok=True)
     # Ensure standard HTTP path; disable xet/transfer accelerations in-process just in case
@@ -395,6 +397,7 @@ def train_lora(
         logging_steps=20,
         save_strategy="epoch" if eff_max_steps == -1 else "steps",
         save_steps=max(100, (eff_max_steps // 5) if eff_max_steps > 0 else 100),
+        save_total_limit=save_total_limit,
         report_to="none",
     )
 
@@ -436,7 +439,50 @@ def train_lora(
     )
     import time, json
     t0 = time.time()
-    trainer.train()
+    # Auto-resume logic: if resume_from_checkpoint is "auto" or None, try to find latest checkpoint in output_dir
+    def _find_latest_checkpoint(dir_path: str):
+        try:
+            if not os.path.isdir(dir_path):
+                return None
+            ckpts = []
+            for name in os.listdir(dir_path):
+                if name.startswith('checkpoint-'):
+                    step_part = name.split('-', 1)[-1]
+                    try:
+                        step = int(step_part)
+                    except ValueError:
+                        continue
+                    ckpt_dir = os.path.join(dir_path, name)
+                    state_ok = os.path.isfile(os.path.join(ckpt_dir, 'trainer_state.json'))
+                    if state_ok:
+                        ckpts.append((step, ckpt_dir))
+            if not ckpts:
+                return None
+            ckpts.sort(key=lambda x: x[0], reverse=True)
+            return ckpts[0][1]
+        except Exception:
+            return None
+
+    resume_arg = None
+    if isinstance(resume_from_checkpoint, str):
+        val = (resume_from_checkpoint or '').strip().lower()
+        if val in ("", "none", "false"):  # explicit no-resume
+            resume_arg = None
+        elif val == "auto":
+            resume_arg = _find_latest_checkpoint(output_dir)
+        else:
+            # treat as path
+            resume_arg = resume_from_checkpoint
+    else:
+        # default to auto if not a string
+        resume_arg = _find_latest_checkpoint(output_dir)
+
+    if resume_arg:
+        print(f"[INFO] Resuming training from checkpoint: {resume_arg}")
+    else:
+        print("[INFO] No checkpoint resume requested or found; starting fresh.")
+
+    trainer.train(resume_from_checkpoint=resume_arg)
     total_time = time.time() - t0
     # Save artifacts
     model.save_pretrained(output_dir)
@@ -490,6 +536,8 @@ if __name__ == "__main__":
     p.add_argument("--subset-size", type=int, default=None, help="Optional cap on number of training examples")
     p.add_argument("--per-device-batch", type=int, default=1, help="Per-device (GPU) batch size")
     p.add_argument("--max-steps", type=int, default=-1, help="Stop after this many optimizer steps (overrides epochs if >0)")
+    p.add_argument("--resume-from-checkpoint", type=str, default="auto", help="Path to checkpoint dir, 'auto' to resume latest if present, or 'none' to disable")
+    p.add_argument("--save-total-limit", type=int, default=2, help="Maximum number of checkpoints to keep")
     a = p.parse_args()
 
     train_lora(
@@ -512,4 +560,6 @@ if __name__ == "__main__":
         subset_size=a.subset_size,
         per_device_batch=a.per_device_batch,
         max_steps=a.max_steps,
+        resume_from_checkpoint=a.resume_from_checkpoint,
+        save_total_limit=a.save_total_limit,
     )

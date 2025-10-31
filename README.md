@@ -42,6 +42,10 @@ conda deactivate myenv
 
 exit
 
+## Quick Model Validation (against test cases):
+
+sbatch check_qwen_params.sh
+
 ---
 
 ## Step 1:

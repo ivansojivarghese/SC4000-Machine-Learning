@@ -46,7 +46,7 @@ fi
 echo "[Step3] Using SCRATCH_BASE=${SCRATCH_BASE}"
 
 # Hugging Face gated model login (only if token available). You can override HF_TOKEN externally.
-export HF_TOKEN="${HF_TOKEN:-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}"
+export HF_TOKEN="${HF_TOKEN:-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}"
 python - <<'PY'
 import os
 tok=os.environ.get('HF_TOKEN')
@@ -315,11 +315,13 @@ LORA_ALPHA=${TEACHER_LORA_ALPHA:-32}
 MAXLEN=${TEACHER_MAXLEN:-512}
 # For fastest training: use minimal accumulation and a larger per-device batch by default.
 # Override with TEACHER_GRAD_ACCUM / TEACHER_PER_DEVICE_BS if you hit OOM on your GPU.
-GRAD_ACCUM=${TEACHER_GRAD_ACCUM:-8}
-BS=${TEACHER_PER_DEVICE_BS:-2}
+GRAD_ACCUM=${TEACHER_GRAD_ACCUM:-1}
+BS=${TEACHER_PER_DEVICE_BS:-16}
 EPOCHS=${TEACHER_EPOCHS:-1}
 LR=${TEACHER_LR:-1e-5}
+# Subset control: default is FULL DATA. To enable subsetting, set TEACHER_ENABLE_SUBSET=1 and TEACHER_SUBSET_SIZE>0
 SUBSET=${TEACHER_SUBSET_SIZE:--1}
+ENABLE_SUBSET=${TEACHER_ENABLE_SUBSET:-0}
 # Default to epoch-driven training: no max-steps unless explicitly provided
 MAX_STEPS=${TEACHER_MAX_STEPS:--1}
 # Time budget auto-capping disabled by default; set >0 to enable custom logic externally
@@ -333,8 +335,15 @@ COMMON_EXTRA_ARGS=()
 if [ -n "${MAX_STEPS}" ] 2>/dev/null && [ "${MAX_STEPS}" -gt 0 ] 2>/dev/null; then
   COMMON_EXTRA_ARGS+=(--max-steps "${MAX_STEPS}")
 fi
-if [ -n "${SUBSET}" ] 2>/dev/null && [ "${SUBSET}" -gt 0 ] 2>/dev/null; then
+if [ "${ENABLE_SUBSET}" = "1" ] 2>/dev/null && [ -n "${SUBSET}" ] 2>/dev/null && [ "${SUBSET}" -gt 0 ] 2>/dev/null; then
+  echo "[Step3] Subsetting enabled: TEACHER_ENABLE_SUBSET=1 -> using subset size ${SUBSET}" >&2
   COMMON_EXTRA_ARGS+=(--subset-size "${SUBSET}")
+else
+  if [ -n "${SUBSET}" ] 2>/dev/null && [ "${SUBSET}" -gt 0 ] 2>/dev/null; then
+    echo "[Step3] Ignoring TEACHER_SUBSET_SIZE=${SUBSET} (set TEACHER_ENABLE_SUBSET=1 to use a subset). Using FULL dataset." >&2
+  else
+    echo "[Step3] Using FULL dataset (no subsetting)." >&2
+  fi
 fi
 
 ###############################################

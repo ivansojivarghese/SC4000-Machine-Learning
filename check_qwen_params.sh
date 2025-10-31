@@ -22,7 +22,7 @@ from transformers import AutoTokenizer, AutoModelForSequenceClassification
 tokenizer = AutoTokenizer.from_pretrained("google/gemma-2-9b-it")
 
 # Load your trained model with 3-class classifier head
-model_path = './model_save/distilled_gemma2-9b_fold_0'  # Fold model has the trained 3-class head
+model_path = './model_save/distilled_gemma2-9b_fold_2'  # Fold model has the trained 3-class head
 model = AutoModelForSequenceClassification.from_pretrained(
     model_path, 
     num_labels=3,  # Explicitly specify 3 classes to match the trained head

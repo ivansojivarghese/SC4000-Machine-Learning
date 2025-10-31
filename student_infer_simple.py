@@ -106,10 +106,13 @@ def main():
     print(f"[Info] Loaded {len(texts)} test samples")
 
     # Determine tokenizer dir and actual model load dir
-    tokenizer_dir = args.model_dir
     model_load_dir = _resolve_model_load_dir(args.model_dir)
-
-    # Load tokenizer (prefer provided dir, then fallback to model load dir)
+    # Try to find tokenizer files in model_dir, else fallback to base model
+    def _has_tokenizer_files(path):
+        files = ["tokenizer.model", "tokenizer.json", "tokenizer_config.json"]
+        return all(os.path.isfile(os.path.join(path, f)) for f in files)
+    tokenizer_dir = args.model_dir if _has_tokenizer_files(args.model_dir) else os.environ.get("BASE_MODEL", "google/gemma-2-9b-it")
+    # Load tokenizer (prefer resolved dir, then fallback to model_load_dir)
     try:
         tokenizer = AutoTokenizer.from_pretrained(tokenizer_dir, use_fast=True)
     except Exception:

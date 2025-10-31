@@ -234,13 +234,13 @@ export HF_HUB_DISABLE_XET=1
 export HF_HUB_HTTP_TIMEOUT=600
 export HF_HUB_DISABLE_TELEMETRY=1
 export HF_HUB_ENABLE_PROGRESS_BARS=1
-export HF_TOKEN="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"
+export HF_TOKEN="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"
 
 python - <<'PY'
 import os, sys
 print("[Step1] Online mode enabled (TRANSFORMERS_OFFLINE=0)")
 from huggingface_hub import login
-login(token="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", add_to_git_credential=False)
+login(token="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", add_to_git_credential=False)
 
 qwen_tok = os.environ.get("QWEN_TOK", "Qwen/Qwen2.5-7B-Instruct")
 from transformers import AutoTokenizer
@@ -264,7 +264,7 @@ else:
       'tokenizer.json', 'tokenizer_config.json', 'special_tokens_map.json',
       'vocab.json', 'merges.txt', 'tokenizer.model', '*.model', '*.txt'
     ],
-    token="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",
+    token="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",
     resume_download=True,
     local_dir_use_symlinks=False,
     max_workers=1,
@@ -406,7 +406,7 @@ tok=os.environ['LLAMA_TOK']
 print(snapshot_download(
   repo_id=tok,
   allow_patterns=['tokenizer.json','tokenizer_config.json','special_tokens_map.json','vocab.json','merges.txt','tokenizer.model','*.model','*.txt'],
-  token="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",
+  token="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",
   resume_download=True,
   local_dir_use_symlinks=False,
   max_workers=1,

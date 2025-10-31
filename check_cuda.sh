@@ -2,7 +2,7 @@
 #SBATCH --job-name=check_cuda
 #SBATCH --output=check_cuda.out
 #SBATCH --error=check_cuda.err
-#SBATCH --gres=gpu:1              # Request 1 GPU
+#SBATCH --gres=gpu:0              # Request 0 GPUs
 #SBATCH --cpus-per-task=4         # Number of CPU cores
 #SBATCH --mem=8G                  # Memory
 #SBATCH --time=00:10:00           # Max runtime
