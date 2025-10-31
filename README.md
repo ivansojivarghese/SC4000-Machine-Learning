@@ -26,7 +26,7 @@ Step 9: Evaluate CV and LB
 
 ---
 
-HF_token: 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
+HF_token:
 
 ## SLURM Start-up Commands:
 
@@ -155,6 +155,3 @@ Use all available data (Kaggle + external) for training.
 Distillation is key: student models trained on teacher logits generalize better.
 Calibration improves log-loss.
 Ensembling multiple models/folds can further boost performance.
-#### Summary
-The warning is normal; just make sure you train the classification head on labeled data.
-Follow the steps above to complete your pipeline and maximize your leaderboard score.
