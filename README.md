@@ -14,15 +14,15 @@ Step 4.5: Calibrate logits with vector scaling [just LLaMa only]
 
 Step 5: Distill logits into Gemma2-9B model [from LLaMa only]
 
-Step 6: Ensemble LoRA layers from 5 folds [TBA]
+Step 6: Ensemble LoRA layers from 5 folds
 
-Step 7: Quantize final model to 8-bit (GPTQ) [TBA]
+Step 7: Quantize final model to 8-bit (GPTQ)
 
-Step 8: Apply TTA during inference [TBA]
+Step 8: Apply TTA during inference
 
-Step 8.5: TTA Symmetrization Post-processing [TBA]
+Step 8.5: TTA Symmetrization Post-processing
 
-Step 9: Evaluate CV and LB [TBA]
+Step 9: Evaluate CV and LB
 
 ---
 
