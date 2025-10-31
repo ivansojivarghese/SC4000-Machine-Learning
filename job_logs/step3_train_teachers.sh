@@ -46,7 +46,7 @@ fi
 echo "[Step3] Using SCRATCH_BASE=${SCRATCH_BASE}"
 
 # Hugging Face gated model login (only if token available). You can override HF_TOKEN externally.
-export HF_TOKEN="${HF_TOKEN:-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}"
+export HF_TOKEN="${HF_TOKEN:-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}"
 python - <<'PY'
 import os
 tok=os.environ.get('HF_TOKEN')

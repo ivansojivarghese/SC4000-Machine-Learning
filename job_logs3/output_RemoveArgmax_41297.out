@@ -1,0 +1,20 @@
+[RemoveArgmax] Removing 'argmax' column from all fold train/val files...
+Processing data/fold_data/fold_0_train.csv
+Processing data/fold_data/fold_1_train.csv
+Processing data/fold_data/fold_2_train.csv
+Processing data/fold_data/fold_0_val.csv
+Processing data/fold_data/fold_1_val.csv
+Processing data/fold_data/fold_2_val.csv
+Processing fold_data/fold_0_train.csv
+Processing fold_data/fold_1_train.csv
+Processing fold_data/fold_2_train.csv
+Processing fold_data/fold_0_val.csv
+Processing fold_data/fold_1_val.csv
+Processing fold_data/fold_2_val.csv
+Processing /scratch-shared/tc1proj005/fold_data/fold_0_train.csv
+Processing /scratch-shared/tc1proj005/fold_data/fold_1_train.csv
+Processing /scratch-shared/tc1proj005/fold_data/fold_2_train.csv
+Processing /scratch-shared/tc1proj005/fold_data/fold_0_val.csv
+Processing /scratch-shared/tc1proj005/fold_data/fold_1_val.csv
+Processing /scratch-shared/tc1proj005/fold_data/fold_2_val.csv
+[RemoveArgmax] Done.

@@ -1,0 +1,18 @@
+
+Test: B wins clearly
+  model_a: 0.2047
+  model_b: 0.5987
+  tie:     0.1966
+  ✅ PASS - B correctly predicted as winner
+
+Test: A and B are close
+  model_a: 0.3126
+  model_b: 0.3663
+  tie:     0.3211
+  ⚠️  WARN - Expected tie/close, but tie=0.3211 is low
+
+Test: B wins clearly
+  model_a: 0.3848
+  model_b: 0.3361
+  tie:     0.2791
+  ❌ FAIL - Expected B to win (>0.5), but got model_b=0.3361
