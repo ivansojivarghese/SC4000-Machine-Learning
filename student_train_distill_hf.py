@@ -789,8 +789,38 @@ def train_student_distill(
     # Build callbacks conditionally: EarlyStopping requires an eval strategy.
     support_eval_strategy = 'evaluation_strategy' in allowed
     callbacks_list = [ThroughputLoggerCallback(train_tok), EvalLoggerCallback(output_dir)]
+    # Reporter to emit an explicit message and marker file when early stopping triggers
+    class EarlyStopReporter(TrainerCallback):
+        def __init__(self, out_dir: str, patience: int):
+            self.out_dir = out_dir
+            self.patience = int(patience)
+            self._reported = False
+        def on_evaluate(self, args, state, control, metrics=None, **kwargs):
+            try:
+                if getattr(control, 'should_training_stop', False) and not self._reported:
+                    step = int(getattr(state, 'global_step', 0) or 0)
+                    ep = getattr(state, 'epoch', None)
+                    msg = f"[Distill][EarlyStop] Patience={self.patience} exhausted at step={step}{f' epoch={ep:.2f}' if ep is not None else ''}. Stopping training."
+                    print(msg)
+                    rec = {
+                        'early_stopped': True,
+                        'patience': self.patience,
+                        'step': step,
+                        'epoch': float(ep) if ep is not None else None,
+                        'last_metrics': {k: float(v) for k, v in (metrics or {}).items() if isinstance(v, (int, float))},
+                    }
+                    try:
+                        os.makedirs(self.out_dir, exist_ok=True)
+                        with open(os.path.join(self.out_dir, 'early_stopped.json'), 'w') as f:
+                            json.dump(rec, f, indent=2)
+                    except Exception:
+                        pass
+                    self._reported = True
+            except Exception:
+                pass
     if support_eval_strategy and early_stopping_patience and early_stopping_patience > 0:
-        callbacks_list.insert(0, EarlyStoppingCallback(early_stopping_patience=early_stopping_patience))
+        # Ensure EarlyStoppingCallback runs before reporter so control.should_training_stop is set
+        callbacks_list = [EarlyStoppingCallback(early_stopping_patience=early_stopping_patience), EarlyStopReporter(output_dir, early_stopping_patience)] + callbacks_list
 
     trainer = DistillTrainer(
         model=model,
