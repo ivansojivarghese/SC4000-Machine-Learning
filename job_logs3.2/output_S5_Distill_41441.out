@@ -1,0 +1,27 @@
+[Step5] Distilling fold 1 using LLaMA-only OOF probs
+[Step5] Step-capped training: --max_steps=3000 will limit total steps (overrides epochs)
+[Step5] Eval strategy=steps steps | Save strategy=steps (save_steps=200) | logging_steps=100
+{'loss': 1.0935, 'grad_norm': 4.49307918548584, 'learning_rate': 1.6861702127659575e-05, 'epoch': 1.22}
+{'loss': 1.1066, 'grad_norm': 5.489818572998047, 'learning_rate': 1.597517730496454e-05, 'epoch': 1.25}
+{'loss': 1.0982, 'grad_norm': 9.634328842163086, 'learning_rate': 1.5088652482269505e-05, 'epoch': 1.28}
+{'loss': 1.1285, 'grad_norm': 9.116987228393555, 'learning_rate': 1.420212765957447e-05, 'epoch': 1.31}
+{'loss': 1.0982, 'grad_norm': 4.971225738525391, 'learning_rate': 1.3315602836879435e-05, 'epoch': 1.34}
+{'loss': 1.0853, 'grad_norm': 5.4568305015563965, 'learning_rate': 1.2429078014184398e-05, 'epoch': 1.37}
+{'loss': 1.0978, 'grad_norm': 7.049352645874023, 'learning_rate': 1.1542553191489362e-05, 'epoch': 1.4}
+{'loss': 1.0555, 'grad_norm': 5.889078140258789, 'learning_rate': 1.0656028368794328e-05, 'epoch': 1.43}
+{'loss': 1.1112, 'grad_norm': 8.19916820526123, 'learning_rate': 9.769503546099292e-06, 'epoch': 1.46}
+{'loss': 1.1167, 'grad_norm': 7.039113998413086, 'learning_rate': 8.882978723404256e-06, 'epoch': 1.49}
+{'loss': 1.1207, 'grad_norm': 11.667525291442871, 'learning_rate': 7.99645390070922e-06, 'epoch': 1.52}
+{'loss': 1.1416, 'grad_norm': 8.266599655151367, 'learning_rate': 7.109929078014185e-06, 'epoch': 1.55}
+{'loss': 1.1226, 'grad_norm': 6.127971172332764, 'learning_rate': 6.22340425531915e-06, 'epoch': 1.58}
+{'loss': 1.0152, 'grad_norm': 8.320884704589844, 'learning_rate': 5.336879432624114e-06, 'epoch': 1.61}
+{'loss': 1.0071, 'grad_norm': 4.873011589050293, 'learning_rate': 4.450354609929078e-06, 'epoch': 1.64}
+{'loss': 1.0569, 'grad_norm': 4.6289215087890625, 'learning_rate': 3.563829787234043e-06, 'epoch': 1.67}
+{'loss': 1.0449, 'grad_norm': 6.388453483581543, 'learning_rate': 2.6773049645390073e-06, 'epoch': 1.7}
+{'loss': 1.0153, 'grad_norm': 4.917984485626221, 'learning_rate': 1.790780141843972e-06, 'epoch': 1.73}
+{'loss': 0.9944, 'grad_norm': 5.928469181060791, 'learning_rate': 9.042553191489361e-07, 'epoch': 1.76}
+{'loss': 1.0157, 'grad_norm': 11.178912162780762, 'learning_rate': 1.773049645390071e-08, 'epoch': 1.79}
+{'train_runtime': 14623.1688, 'train_samples_per_second': 6.565, 'train_steps_per_second': 0.205, 'train_loss': 0.3587626241048177, 'epoch': 1.79}
+[Distill][Eval] step=3000 epoch=1.79 eval_loss=0.2974 eval_log_loss=0.9681 acc=0.5409
+{'eval': {'eval_loss': 0.29739564657211304, 'eval_log_loss': 0.9681217177939353, 'eval_accuracy': 0.5409174928583431, 'eval_runtime': 811.937, 'eval_samples_per_second': 7.329, 'eval_steps_per_second': 0.916, 'epoch': 1.7922330097087378}}
+[Step5] Done fold 1 -> model_save/distilled_gemma2-9b_fold_1

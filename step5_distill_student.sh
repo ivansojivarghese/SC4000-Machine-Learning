@@ -49,7 +49,7 @@ MSE_W=${STUDENT_MSE_WEIGHT:-0.05}
 LABEL_SMOOTH=${STUDENT_LABEL_SMOOTH:-0.05}
 MAXLEN=${STUDENT_MAXLEN:-384}
 # Leave STUDENT_MAX_STEPS unset to run purely by epochs; set to a positive int to cap by steps
-MAX_STEPS=${STUDENT_MAX_STEPS:-2000}
+MAX_STEPS=${STUDENT_MAX_STEPS:-4000}
 RESUME_CHECKPOINT=${RESUME_CHECKPOINT:-}
 OVERWRITE=${STUDENT_OVERWRITE:-0}
 # Early stopping patience (in evaluation events). With evaluation_strategy=epoch, this is epochs without improvement.
