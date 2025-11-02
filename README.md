@@ -1,5 +1,7 @@
 # Pipeline flow:
 
+=== Using Winning Solution ===
+
 Step 1: Post-pretrain large models on UT dataset [just LLaMA only]
 
 Step 2: Split Kaggle + 33k data into 5 folds [3 folds]
@@ -14,21 +16,29 @@ Step 4.5: Calibrate logits with vector scaling [just LLaMa only]
 
 Step 5: Distill logits into Gemma2-9B model [from LLaMa only]
 
-Step 6: Ensemble LoRA layers from 5 folds
+=== End of Winning Solution ===
 
-Step 7: Quantize final model to 8-bit (GPTQ)
+Step 6: Direct inference (& ensembling) of LoRA adapters (from Folds) to Gemma2ForSequenceClassification
 
-Step 8: Apply TTA during inference
+Step 7: TTA Symmetrization Post-processing
 
-Step 8.5: TTA Symmetrization Post-processing
+=== Below Steps of Winning Solution not used ===
 
-Step 9: Evaluate CV and LB
+NIL: Ensemble LoRA layers from 5 folds
+
+NIL: Quantize final model to 8-bit (GPTQ)
+
+NIL: Apply TTA during inference
+
+NIL: Evaluate CV and LB
 
 ---
 
 ## References
 
 - [Training Gemma 2 9B 4-bit QLoRA Fine-Tuning (Kaggle Notebook)](https://www.kaggle.com/code/emiz6413/training-gemma-2-9b-4-bit-qlora-fine-tuning/notebook#Note)
+
+- [Inference Gemma-2 9b 4-bit QLoRA](https://www.kaggle.com/code/emiz6413/inference-gemma-2-9b-4-bit-qlora/notebook)
 
 - [BlackPearl No-Leak 1st Place Solution – LMSYS Chatbot Arena (Kaggle Competition Write-up)](https://www.kaggle.com/competitions/lmsys-chatbot-arena/writeups/blackpearl-no-leak-1st-place-solution-distill-is-a)
 
