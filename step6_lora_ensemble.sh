@@ -24,7 +24,7 @@ cd ~/exported-assets_sc4000
 
 # Inputs
 BASE_MODEL=${BASE_MODEL:-google/gemma-2-9b-it}
-FOLDS=${FOLDS:-"0,1"}
+FOLDS=${FOLDS:-"0,1,2"}
 LORA_DIR_PREFIX=${LORA_DIR_PREFIX:-model_save/distilled_gemma2-9b_fold_}
 OUT_LORA=${OUT_LORA:-model_save/avg_lora}
 OUT_MERGED=${OUT_MERGED:-model_save/final_merged_model}
@@ -34,7 +34,7 @@ python - <<'PY'
 import os, json, shutil, torch
 from safetensors.torch import load_file, save_file
 
-folds = [0, 1]  # Only use folds 0 and 1 for averaging; ignore fold 2
+folds = [0, 1, 2]  # Include all folds for averaging
 pref = os.environ.get('LORA_DIR_PREFIX','model_save/distilled_gemma2-9b_fold_')
 out_dir = os.environ.get('OUT_LORA','model_save/avg_lora')
 os.makedirs(out_dir, exist_ok=True)

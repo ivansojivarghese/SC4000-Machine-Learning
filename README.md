@@ -152,7 +152,7 @@ sbatch step6_lora_ensemble.sh
 
 ### Step 7: 
 
-sbatch step7_quantize_gptq.sh (OPTIONAL TO RUN)
+sbatch step7_quantize_gptq.sh
 
 ---
 
