@@ -1,48 +1,45 @@
-# Pipeline flow:
+# Solution:
 
-=== Using Winning Solution ===
+=== Referencing Winning Solution: [BlackPearl No-Leak 1st Place Solution – LMSYS Chatbot Arena (Kaggle Competition Write-up)](https://www.kaggle.com/competitions/lmsys-chatbot-arena/writeups/blackpearl-no-leak-1st-place-solution-distill-is-a) ===
 
-Step 1: Post-pretrain large models on UT dataset [just LLaMA only]
+Models: 
+- [google/gemma-2-9b](https://huggingface.co/google/gemma-2-9b) (Student)
+- [meta-llama/Llama-3.1-8B-Instruct](https://huggingface.co/meta-llama/Llama-3.1-8B-Instruct) (Teacher)
+- [Qwen/Qwen2.5-7B-Instruct](https://huggingface.co/Qwen/Qwen2.5-VL-7B-Instruct) (Teacher)
 
-Step 2: Split Kaggle + 33k data into 5 folds [3 folds]
+## Pipeline Flow: 
 
-Step 2.5: Remove argmax samples from folds [3 folds]
+Step `k`: Winning Solution step [our solution step / difference(s)]
 
-Step 3: Train LLaMA3 70B & Qwen2 72B on folds [just LLaMA only]
-
-Step 4: Infer logits for all training data [just LLaMa only]
-
-Step 4.5: Calibrate logits with vector scaling [just LLaMa only]
-
-Step 5: Distill logits into Gemma2-9B model [from LLaMa only]
+- Step 1: Post-pretrain Teacher models on UT dataset [just LLaMA only]
+- Step 2: Split Kaggle + 33k data into 5 folds [3 folds]
+- Step 2.5: Remove argmax samples from folds [3 folds]
+- Step 3: Train Teacher models on folds [just LLaMA only]
+- Step 4: Infer logits for all training data [just LLaMa only]
+- Step 4.5: Calibrate logits with vector scaling [just LLaMa only]
+- Step 5: Distill logits into Gemma2-9B model [from LLaMa only]
 
 === End of Winning Solution ===
 
-Step 6: Direct inference (& ensembling) of LoRA adapters (from Folds) to Gemma2ForSequenceClassification
+=== Referencing Inference Solution [Inference Gemma-2 9b 4-bit QLoRA](https://www.kaggle.com/code/emiz6413/inference-gemma-2-9b-4-bit-qlora/notebook) ===
 
-Step 7: TTA Symmetrization Post-processing
+- Step 6: Direct inference (& ensembling) of LoRA adapters (from Folds) to Gemma2ForSequenceClassification
+- Step 7: TTA Symmetrization Post-processing
 
-=== Below Steps of Winning Solution not used ===
+===
 
-NIL: Ensemble LoRA layers from 5 folds
+=== Below Steps of Winning Solution not used for final model ===
 
-NIL: Quantize final model to 8-bit (GPTQ)
+- Step 6: Ensemble LoRA layers from 5 folds
+- Step 7: Quantize final model to 8-bit (GPTQ)
+- Step 8: Apply TTA during inference
+- Step 9: Evaluate CV and LB
 
-NIL: Apply TTA during inference
-
-NIL: Evaluate CV and LB
+===
 
 ---
 
-## References
-
-- [Training Gemma 2 9B 4-bit QLoRA Fine-Tuning (Kaggle Notebook)](https://www.kaggle.com/code/emiz6413/training-gemma-2-9b-4-bit-qlora-fine-tuning/notebook#Note)
-
-- [Inference Gemma-2 9b 4-bit QLoRA](https://www.kaggle.com/code/emiz6413/inference-gemma-2-9b-4-bit-qlora/notebook)
-
-- [BlackPearl No-Leak 1st Place Solution – LMSYS Chatbot Arena (Kaggle Competition Write-up)](https://www.kaggle.com/competitions/lmsys-chatbot-arena/writeups/blackpearl-no-leak-1st-place-solution-distill-is-a)
-
-- [RLP: Reinforcement as a Pretraining Objective](https://research.nvidia.com/labs/adlr/RLP/)
+## Notes (of good relevance)
 
 | Section                     | Quote                                                         | Relevance                                            | Action       |
 | ---------------------------- | ------------------------------------------------------------- | ---------------------------------------------------- | ------------ |
@@ -53,7 +50,7 @@ NIL: Evaluate CV and LB
 
 ---
 
-HF_token:
+HF_token: REDACTED
 
 ## SLURM Start-up Commands:
 
@@ -75,7 +72,9 @@ sbatch check_qwen_params.sh
 
 ---
 
-## Step 1:
+## Winning Solution
+
+### Step 1:
 
 RUN_STAGE=gemma SCRATCH_BASE=/scratch-shared/tc1proj005 sbatch step1_post_pretrain.sh
 
@@ -83,19 +82,19 @@ RUN_STAGE=llama SCRATCH_BASE=/scratch-shared/tc1proj005 sbatch step1_post_pretra
 
 ---
 
-## Step 2:
+### Step 2:
 
 sbatch step2_make_folds.sh
 
 ---
 
-## Step 2.5: 
+### Step 2.5: 
 
 sbatch remove_argmax_from_folds.sh 
 
 ---
 
-## Step 3:
+### Step 3:
 
 TEACHER_SUBSET_SIZE=20000 TEACHER_MAX_STEPS=300 TEACHER_FOLDS="0" SKIP_QWEN=1 sbatch step3_train_teachers.sh
 
@@ -105,7 +104,7 @@ TEACHER_SUBSET_SIZE=20000 TEACHER_MAX_STEPS=300 TEACHER_FOLDS="2" SKIP_QWEN=1 sb
 
 ---
 
-## Step 4:
+### Step 4:
 
 INFER_FOLDS=0 INFER_MODELS=llama INFER_PREFER_LORA=1 INFER_LLAMA_SUBSET=15000-20000 INFER_LOGPROB_BATCH=8 INFER_PROGRESS_EVERY=5 sbatch step4_infer_teacher_logits.sh 
 
@@ -115,13 +114,13 @@ INFER_FOLDS=2 INFER_MODELS=llama INFER_PREFER_LORA=1 INFER_LLAMA_SUBSET=15000-20
 
 ---
 
-## Step 4.5:
+### Step 4.5:
 
 sbatch calibrate_vector_scaling.sh (OPTIONAL TO RUN)
 
 ---
 
-## Step 5:
+### Step 5: Each Fold trained for 3 epochs (5000 steps)
 
 FOLDS=0 sbatch step5_distill_student.sh
 
@@ -131,30 +130,50 @@ FOLDS=2 sbatch step5_distill_student.sh
 
 ---
 
-## Step 6:
+## Inference Solution
+
+---
+
+### Step 6: Direct inference (& ensembling) of LoRA adapters (from Folds) to Gemma2ForSequenceClassification
+
+---
+
+### Step 7: TTA Symmetrization Post-processing
+
+---
+
+## Winning Solution (did not use the below steps for final model)
+
+### Step 6:
 
 sbatch step6_lora_ensemble.sh
 
 ---
 
-## Step 7: 
+### Step 7: 
 
 sbatch step7_quantize_gptq.sh (OPTIONAL TO RUN)
 
 ---
 
-## Step 8:
+### Step 8:
 
 sbatch step8_infer_tta.sh
 
 ---
 
-## Step 8.5: TTA Symmetrization Post-processing
-
----
-
-## Step 9:
+### Step 9:
 
 sbatch step9_eval.sh (OPTIONAL TO RUN)
 
 ---
+
+## References
+
+- [Training Gemma 2 9B 4-bit QLoRA Fine-Tuning (Kaggle Notebook)](https://www.kaggle.com/code/emiz6413/training-gemma-2-9b-4-bit-qlora-fine-tuning/notebook#Note)
+
+- [Inference Gemma-2 9b 4-bit QLoRA](https://www.kaggle.com/code/emiz6413/inference-gemma-2-9b-4-bit-qlora/notebook)
+
+- [BlackPearl No-Leak 1st Place Solution – LMSYS Chatbot Arena (Kaggle Competition Write-up)](https://www.kaggle.com/competitions/lmsys-chatbot-arena/writeups/blackpearl-no-leak-1st-place-solution-distill-is-a)
+
+- [RLP: Reinforcement as a Pretraining Objective](https://research.nvidia.com/labs/adlr/RLP/)
