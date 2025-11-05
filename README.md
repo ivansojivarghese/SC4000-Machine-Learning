@@ -18,7 +18,7 @@ Step `k`: Winning Solution step [our solution step / difference(s)]
 - Step 4: Infer logits for all training data [just LLaMa only, training subset reduced to 15000-20000]
 - Step 4.5: [Calibrate logits with vector scaling]
 - Step 5: Distill logits into Gemma2-9B model [from LLaMa only, 3 epochs per fold]
-- Step 6: Ensemble LoRA layers from Folds [3 folds]
+- Step 6: Ensemble LoRA layers from Folds [3 folds, to 16-bit initial model]
 - Step 7: Quantize final model to 8-bit in GPTQ [4-bit GPTQ]
 
 === End of Winning Solution ===
@@ -130,7 +130,7 @@ FOLDS=2 sbatch step5_distill_student.sh
 
 ### Step 6:
 
-sbatch step6_lora_ensemble.sh
+sbatch step6_lora_ensemble.sh (16 BIT)
 
 ---
 
