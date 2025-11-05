@@ -102,9 +102,6 @@ def quantize_with_calibration(
     use_safetensors: bool = True,
     tokenizer_dir: str = '',
 ):
-    if AutoGPTQForCausalLM is None:
-        raise RuntimeError("auto-gptq is not installed or failed to import. Please ensure it is available in your environment.")
-
     os.makedirs(out_dir, exist_ok=True)
 
     random.seed(seed)

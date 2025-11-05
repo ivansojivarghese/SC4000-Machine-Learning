@@ -28,6 +28,8 @@ FOLDS=${FOLDS:-"0,1,2"}
 LORA_DIR_PREFIX=${LORA_DIR_PREFIX:-model_save/distilled_gemma2-9b_fold_}
 OUT_LORA=${OUT_LORA:-model_save/avg_lora}
 OUT_MERGED=${OUT_MERGED:-model_save/final_merged_model}
+SKIP_MERGE=${SKIP_MERGE:-0}
+MERGE_DTYPE=${MERGE_DTYPE:-bf16}   # fp32|bf16|fp16
 
 echo "[Step6] Averaging LoRA adapters across folds: $FOLDS -> $OUT_LORA"
 python - <<'PY'
@@ -91,7 +93,13 @@ else:
 	print("[Step6][Warn] No adapter_config.json found in any fold dir; merge may fail. Provide a config or re-run Step5 with PEFT saving.")
 PY
 
-echo "[Step6] Merging averaged LoRA into base: $BASE_MODEL -> $OUT_MERGED"
-python lora_merge.py --base-model "$BASE_MODEL" --lora-dir "$OUT_LORA" --out-dir "$OUT_MERGED"
+# Option A: Skip merging and keep only averaged adapter for runtime 4-bit loading
+if [[ "$SKIP_MERGE" == "1" ]]; then
+	echo "[Step6] SKIP_MERGE=1 -> Not merging. Averaged adapter ready at $OUT_LORA"
+	exit 0
+fi
+
+echo "[Step6] Merging averaged LoRA into base: $BASE_MODEL -> $OUT_MERGED (dtype=$MERGE_DTYPE)"
+python lora_merge.py --base-model "$BASE_MODEL" --lora-dir "$OUT_LORA" --out-dir "$OUT_MERGED" --dtype "$MERGE_DTYPE"
 
 echo "[Step6] Done: merged model in $OUT_MERGED"

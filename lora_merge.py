@@ -3,6 +3,7 @@ import json
 import argparse
 import gc
 from contextlib import contextmanager
+from typing import Optional
 from peft import PeftModel
 from transformers import AutoModelForSequenceClassification
 import torch
@@ -27,16 +28,16 @@ def _temporary_hide_gpus(enabled: bool):
             os.environ["CUDA_VISIBLE_DEVICES"] = original
 
 
-def _select_cpu_dtype():
-    """Choose the lightest viable dtype for CPU merge.
-    Preference: float16 if supported, else bfloat16, else float32.
+def _select_cpu_dtype(target: Optional[torch.dtype] = None):
+    """Choose the dtype for CPU merge. If target provided, use it; else fallback to float16.
+    Note: merge is mostly parameter arithmetic, so float16/bfloat16 are generally OK.
     """
-    # Some ops on older CPUs may not like bfloat16/float16; we optimistically try float16.
-    # The merge itself is mostly parameter arithmetic (matmul not required), so float16 ok.
+    if target is not None:
+        return target
     return torch.float16
 
 
-def _merge_low_mem(base_model: str, lora_dir: str, hf_token: str, hide_gpu: bool = True, force_cpu: bool = True):
+def _merge_low_mem(base_model: str, lora_dir: str, hf_token: str, hide_gpu: bool = True, force_cpu: bool = True, target_dtype: Optional[torch.dtype] = None):
     """Load base + LoRA entirely on CPU to merge, avoiding GPU OOM.
 
     Strategies:
@@ -45,7 +46,7 @@ def _merge_low_mem(base_model: str, lora_dir: str, hf_token: str, hide_gpu: bool
       - Use the smallest safe dtype to reduce RAM footprint.
     """
     print("[Merge] Low-memory CPU merge path engaged (forcing CPU load, minimal dtype)")
-    cpu_dtype = _select_cpu_dtype()
+    cpu_dtype = _select_cpu_dtype(target_dtype)
     with _temporary_hide_gpus(hide_gpu):
         if force_cpu:
             torch.cuda.is_available = lambda: False  # type: ignore
@@ -65,6 +66,12 @@ def _merge_low_mem(base_model: str, lora_dir: str, hf_token: str, hide_gpu: bool
         peft = PeftModel.from_pretrained(base, lora_dir, device_map={"": "cpu"})
         merged = peft.merge_and_unload()
         merged.to("cpu")
+        # Cast to requested dtype for smaller disk size
+        try:
+            if cpu_dtype is not None:
+                merged = merged.to(cpu_dtype)
+        except Exception:
+            pass
         # Ensure config is correct
         merged.config.num_labels = 3
         merged.config.id2label = {0: "A", 1: "B", 2: "tie"}
@@ -121,7 +128,7 @@ def _ensure_config(out_dir: str, model: torch.nn.Module):
             print(f"[Merge][Warn] Failed to write fallback config.json: {e}")
 
 
-def merge_lora(base_model: str, lora_dir: str, out_dir: str, low_mem: bool = False, cpu_only: bool = False):
+def merge_lora(base_model: str, lora_dir: str, out_dir: str, low_mem: bool = False, cpu_only: bool = False, dtype: str = "fp32"):
     os.makedirs(out_dir, exist_ok=True)
     # Ensure standard HTTP path; disable xet/transfer accelerations in-process
     os.environ.setdefault("TRANSFORMERS_OFFLINE", "0")
@@ -134,12 +141,15 @@ def merge_lora(base_model: str, lora_dir: str, out_dir: str, low_mem: bool = Fal
     os.environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
     hf_token = os.environ.get("HF_TOKEN") or os.environ.get("HUGGINGFACE_TOKEN")
     merged = None
+    # Map dtype string to torch dtype
+    dtype_map = {"fp32": torch.float32, "bf16": torch.bfloat16, "fp16": torch.float16}
+    target_dtype = dtype_map.get(dtype, torch.float32)
     if cpu_only:
         print("[Merge] --cpu-only specified; skipping any GPU attempt.")
         low_mem = True
 
     if low_mem:
-        merged = _merge_low_mem(base_model, lora_dir, hf_token, hide_gpu=True, force_cpu=cpu_only or True)
+        merged = _merge_low_mem(base_model, lora_dir, hf_token, hide_gpu=True, force_cpu=cpu_only or True, target_dtype=target_dtype)
     else:
         try:
             base = AutoModelForSequenceClassification.from_pretrained(
@@ -151,9 +161,16 @@ def merge_lora(base_model: str, lora_dir: str, out_dir: str, low_mem: bool = Fal
                 num_labels=3,
                 id2label={0: "A", 1: "B", 2: "tie"},
                 label2id={"A": 0, "B": 1, "tie": 2},
+                torch_dtype=target_dtype,
             )
             peft = PeftModel.from_pretrained(base, lora_dir)
             merged = peft.merge_and_unload()
+            # Ensure target dtype before saving
+            try:
+                if target_dtype is not None:
+                    merged = merged.to(target_dtype)
+            except Exception:
+                pass
             merged.config.num_labels = 3
             merged.config.id2label = {0: "A", 1: "B", 2: "tie"}
             merged.config.label2id = {"A": 0, "B": 1, "tie": 2}
@@ -167,7 +184,7 @@ def merge_lora(base_model: str, lora_dir: str, out_dir: str, low_mem: bool = Fal
                     pass
                 gc.collect()
                 _free_cuda()
-                merged = _merge_low_mem(base_model, lora_dir, hf_token, hide_gpu=True, force_cpu=True)
+                merged = _merge_low_mem(base_model, lora_dir, hf_token, hide_gpu=True, force_cpu=True, target_dtype=target_dtype)
             else:
                 raise
     print(f"[Merge] Saving merged model to {out_dir}")
@@ -199,5 +216,6 @@ if __name__ == "__main__":
     ap.add_argument("--out-dir", required=True)
     ap.add_argument("--low-mem", action="store_true", help="Force CPU/low-memory merge path (still allows GPU visibility)")
     ap.add_argument("--cpu-only", action="store_true", help="Force CPU merge and hide GPUs (strongest OOM avoidance)")
+    ap.add_argument("--dtype", choices=["fp32", "bf16", "fp16"], default="fp32", help="Target dtype for saved merged model")
     args = ap.parse_args()
-    merge_lora(args.base_model, args.lora_dir, args.out_dir, low_mem=args.low_mem, cpu_only=args.cpu_only)
+    merge_lora(args.base_model, args.lora_dir, args.out_dir, low_mem=args.low_mem, cpu_only=args.cpu_only, dtype=args.dtype)

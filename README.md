@@ -18,20 +18,20 @@ Step `k`: Winning Solution step [our solution step / difference(s)]
 - Step 4: Infer logits for all training data [just LLaMa only]
 - Step 4.5: Calibrate logits with vector scaling [just LLaMa only]
 - Step 5: Distill logits into Gemma2-9B model [from LLaMa only]
+- Step 6: Ensemble LoRA layers from Folds 
+- Step 7: Quantize final model to 4-bit (GPTQ)
 
 === End of Winning Solution ===
 
 === Referencing Inference Solution [Inference Gemma-2 9b 4-bit QLoRA](https://www.kaggle.com/code/emiz6413/inference-gemma-2-9b-4-bit-qlora/notebook) ===
 
-- Step 6: Direct inference (& ensembling) of LoRA adapters (from Folds) to Gemma2ForSequenceClassification
-- Step 7: TTA Symmetrization Post-processing
+- Step 8: Direct inference (& ensembling) of LoRA adapters (from Folds) to Gemma2ForSequenceClassification
+- Step 9: TTA Symmetrization Post-processing
 
 ===
 
 === Below Steps of Winning Solution not used for final model ===
 
-- Step 6: Ensemble LoRA layers from 5 folds
-- Step 7: Quantize final model to 8-bit (GPTQ)
 - Step 8: Apply TTA during inference
 - Step 9: Evaluate CV and LB
 
@@ -128,37 +128,35 @@ FOLDS=1 sbatch step5_distill_student.sh
 
 FOLDS=2 sbatch step5_distill_student.sh
 
----
-
-## Inference Solution
-
----
-
-### Step 6: Direct inference (& ensembling) of LoRA adapters (from Folds) to Gemma2ForSequenceClassification
-
----
-
-### Step 7: TTA Symmetrization Post-processing
-
----
-
-## Winning Solution (did not use the below steps for final model)
-
 ### Step 6:
 
 sbatch step6_lora_ensemble.sh
 
 ---
 
-### Step 7: 
+### Step 7: Quantization
 
-sbatch step7_quantize_gptq.sh
+sbatch gptq.sh (4 BIT QUANTIZATION - USED FOR FINAL MODEL)
+
+sbatch gptq_8bit.sh (8 BIT QUANTIZATION - NOT USED FOR FINAL MODEL)
 
 ---
 
+## Inference Solution
+
+### Step 8: Direct inference (& ensembling) of LoRA adapters (from Folds) to Gemma2ForSequenceClassification (Final Model)
+
+---
+
+### Step 9: TTA Symmetrization Post-processing
+
+---
+
+## Winning Solution (did not use the below steps for final model)
+
 ### Step 8:
 
-sbatch step8_infer_tta.sh
+sbatch step8_infer_tta.sh (OPTIONAL TO RUN)
 
 ---
 

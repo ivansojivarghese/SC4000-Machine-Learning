@@ -41,7 +41,16 @@ if [ ! -f "$HEAD_OUT" ]; then
   fi
 fi
 
-MODEL_DIR=${MODEL_DIR:-./model_save/final_merged_model}
+# Prefer the quantized package if it exists (supports BNB_INT8 fallback via pointer files)
+QUANT_DIR=${QUANT_DIR:-./model_save/final_quantized_model}
+if [ -z "${MODEL_DIR:-}" ]; then
+  if [ -d "$QUANT_DIR" ]; then
+    MODEL_DIR="$QUANT_DIR"
+    echo "[Step8] Using quantized package at $MODEL_DIR"
+  else
+    MODEL_DIR="./model_save/final_merged_model"
+  fi
+fi
 TEST_CSV=${TEST_CSV:-./data/test.csv}
 OUT_SUB=${OUT_SUB:-./sub/final_submission.csv}
 CALIB_JSON=${CALIB_JSON:-${HEAD_DIR}/calibration.json}
