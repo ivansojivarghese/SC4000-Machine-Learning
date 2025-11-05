@@ -11,13 +11,13 @@ Models:
 
 Step `k`: Winning Solution step [our solution step / difference(s)]
 
-- Step 1: Post-pretrain Teacher models on UT dataset [just LLaMA only]
-- Step 2: Split Kaggle + 33k data into 5 folds [3 folds]
-- Step 2.5: Remove argmax samples from folds [3 folds]
-- Step 3: Train Teacher models on folds [just LLaMA only]
-- Step 4: Infer logits for all training data [just LLaMa only]
-- Step 4.5: Calibrate logits with vector scaling [just LLaMa only]
-- Step 5: Distill logits into Gemma2-9B model [from LLaMa only]
+- Step 1: Post-pretrain all models on the [UT dataset](https://www.kaggle.com/competitions/lmsys-chatbot-arena/discussion/499756) for 1 epoch each [just LLaMA and Gemma only, 0.01 epochs each]
+- Step 2: Split Kaggle + [33k data](https://www.kaggle.com/competitions/lmsys-chatbot-arena/discussion/500973) into 5 folds [3 folds]
+- Step 2.5: [Remove argmax samples from all 3 folds, data cleaning]
+- Step 3: Train Teacher models on folds for 1 epoch each [just LLaMA only, 0.2 epochs, training subset reduced to 20000]
+- Step 4: Infer logits for all training data [just LLaMa only, training subset reduced to 15000-20000]
+- Step 4.5: [Calibrate logits with vector scaling]
+- Step 5: Distill logits into Gemma2-9B model [from LLaMa only, 3 epochs per fold]
 - Step 6: Ensemble LoRA layers from Folds [3 folds]
 - Step 7: Quantize final model to 8-bit in GPTQ [4-bit GPTQ]
 
@@ -74,7 +74,7 @@ sbatch check_qwen_params.sh
 
 ## Winning Solution
 
-### Step 1:
+### Step 1: 
 
 RUN_STAGE=gemma SCRATCH_BASE=/scratch-shared/tc1proj005 sbatch step1_post_pretrain.sh
 
@@ -144,9 +144,7 @@ sbatch gptq_8bit.sh (8 BIT QUANTIZATION - NOT USED FOR FINAL MODEL)
 
 ## Inference Solution
 
-### Step 8: Direct inference (& ensembling) of LoRA adapters (from Folds) to Gemma2ForSequenceClassification (Final Model)
-
----
+### Step 8: Direct inference (& ensembling) of LoRA adapters (from Folds) using quantized 4-bit final model
 
 ### Step 9: TTA Symmetrization Post-processing
 
