@@ -18,14 +18,14 @@ Step `k`: Winning Solution step [our solution step / difference(s)]
 - Step 4: Infer logits for all training data [just LLaMa only]
 - Step 4.5: Calibrate logits with vector scaling [just LLaMa only]
 - Step 5: Distill logits into Gemma2-9B model [from LLaMa only]
-- Step 6: Ensemble LoRA layers from Folds 
-- Step 7: Quantize final model to 4-bit (GPTQ)
+- Step 6: Ensemble LoRA layers from Folds [3 folds]
+- Step 7: Quantize final model to 8-bit in GPTQ [4-bit GPTQ]
 
 === End of Winning Solution ===
 
 === Referencing Inference Solution [Inference Gemma-2 9b 4-bit QLoRA](https://www.kaggle.com/code/emiz6413/inference-gemma-2-9b-4-bit-qlora/notebook) ===
 
-- Step 8: Direct inference (& ensembling) of LoRA adapters (from Folds) to Gemma2ForSequenceClassification
+- Step 8: Direct inference (& ensembling) of LoRA adapters (from Folds) using quantized 4-bit final model
 - Step 9: TTA Symmetrization Post-processing
 
 ===
