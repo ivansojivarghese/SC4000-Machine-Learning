@@ -17,7 +17,7 @@ Step `k`: Winning Solution step [our solution step / difference(s)]
 - Step 3: Train Teacher models on folds for 1 epoch each [just LLaMA only, 0.2 epochs, training subset reduced to 20000 samples]
 - Step 4: Infer logits for all training data [just LLaMa only, training subset reduced to 15000-20000 samples]
 - Step 4.5: [Calibrate logits with vector scaling]
-- Step 5: Distill logits into Gemma2-9B model [from LLaMa only, 3 epochs per fold]
+- Step 5: Distill logits into Gemma2-9B model [from LLaMa only, 3.6 epochs per fold]
 - Step 6: Ensemble LoRA layers from Folds [3 folds, to 16-bit initial model]
 - Step 7: Quantize final model to 8-bit in GPTQ [4-bit GPTQ]
 
@@ -120,7 +120,7 @@ sbatch calibrate_vector_scaling.sh (OPTIONAL TO RUN)
 
 ---
 
-### Step 5: Each Fold trained for 3 epochs (5000 steps)
+### Step 5: Each Fold trained for 3.6 epochs (6000 steps)
 
 FOLDS=0 sbatch step5_distill_student.sh
 
