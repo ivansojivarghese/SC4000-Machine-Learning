@@ -37,19 +37,6 @@ Step `k`: Winning Solution step [our solution step / difference(s)]
 
 ===
 
----
-
-## Notes (of good relevance)
-
-| Section                     | Quote                                                         | Relevance                                            | Action       |
-| ---------------------------- | ------------------------------------------------------------- | ---------------------------------------------------- | ------------ |
-| **Reward Shaping Mechanism** | “Rewards computed by contrasting predictor with EMA baseline” | Shows how to weight folds relative to baseline       | Implement  |
-| **Group-Relative Advantages** | `A(c) = r(c) - mean(r_group)` ensures unbiased gradients      | Explains why relative weighting works mathematically | Study      |
-| **Information Gain**         | “Reward = increase in log-likelihood”                         | How to weight hard samples higher                    | Implement  |
-| **Monotonic Improvement Proof** | “Even negative rewards improve if relatively better”        | Justifies not discarding the last Fold                      | Understand |
-
----
-
 HF_token: REDACTED
 
 ## SLURM Start-up Commands:
@@ -144,7 +131,7 @@ sbatch gptq_8bit.sh (8 BIT QUANTIZATION - NOT USED FOR FINAL MODEL)
 
 ## Inference Solution
 
-### Step 8: Direct inference (& ensembling) of LoRA adapters (from Folds) using quantized 4-bit final model
+### Step 8: Direct TTA inferencing (& possible ensembling) of LoRA adapters (from Folds), or with single LoRa adapter from the best Fold, using quantized 4-bit final model
 
 ### Step 9: TTA Symmetrization Post-processing
 
@@ -173,3 +160,16 @@ sbatch step9_eval.sh (OPTIONAL TO RUN)
 - [BlackPearl No-Leak 1st Place Solution – LMSYS Chatbot Arena (Kaggle Competition Write-up)](https://www.kaggle.com/competitions/lmsys-chatbot-arena/writeups/blackpearl-no-leak-1st-place-solution-distill-is-a)
 
 - [RLP: Reinforcement as a Pretraining Objective](https://research.nvidia.com/labs/adlr/RLP/)
+
+---
+
+## Notes (of good relevance)
+
+| Section                     | Quote                                                         | Relevance                                            | Action       |
+| ---------------------------- | ------------------------------------------------------------- | ---------------------------------------------------- | ------------ |
+| **Reward Shaping Mechanism** | “Rewards computed by contrasting predictor with EMA baseline” | Shows how to weight folds relative to baseline       | Implement  |
+| **Group-Relative Advantages** | `A(c) = r(c) - mean(r_group)` ensures unbiased gradients      | Explains why relative weighting works mathematically | Study      |
+| **Information Gain**         | “Reward = increase in log-likelihood”                         | How to weight hard samples higher                    | Implement  |
+| **Monotonic Improvement Proof** | “Even negative rewards improve if relatively better”        | Justifies not discarding the last Fold                      | Understand |
+
+---
