@@ -25,7 +25,7 @@ Step `k`: Winning Solution step [our solution step / difference(s)]
 
 === Referencing Inference Solution [Inference Gemma-2 9b 4-bit QLoRA](https://www.kaggle.com/code/emiz6413/inference-gemma-2-9b-4-bit-qlora/notebook) ===
 
-- Step 8: Direct inference (& ensembling) of LoRA adapters (from Folds) using quantized 4-bit final model
+- Step 8: Direct TTA inferencing (& possible ensembling) of LoRA adapters (from Folds), or with single LoRa adapter from the best Fold, using quantized 4-bit final model
 - Step 9: TTA Symmetrization Post-processing
 
 ===
