@@ -25,8 +25,28 @@ Step `k`: Winning Solution step [our solution step / difference(s)]
 
 === Referencing Inference Solution [Inference Gemma-2 9b 4-bit QLoRA](https://www.kaggle.com/code/emiz6413/inference-gemma-2-9b-4-bit-qlora/notebook) ===
 
-- Step 8: Direct TTA inferencing (& possible ensembling) of LoRA adapters (from Folds), or with single LoRa adapter from the best Fold, using quantized 4-bit or 8-bit final models
-- Step 9: TTA Symmetrization Post-processing
+Mostly fusioned/self-derived Steps from this point. No direct referencing from Kaggle sources or solutions.
+
+- Step 8: Direct TTA inferencing (& possible ensembling) of LoRA adapters (from Folds), or with single LoRa adapter from the best Fold, using the quantized 8-bit final model. Pairwise TTA (symmetrization) also implemented. See [RETHINKING REWARD MODELING IN PREFERENCE
+BASED LARGE LANGUAGE MODEL ALIGNMENT](https://openreview.net/pdf/c86736447d5c66dec8140360ab743a130d9ff219.pdf#:~:text=reward%20estimation%20in%20the%20context,LLMs%2C%202%20datasets%2C%203%20response).
+- Step 9: Involving the concept of 'Self-ensembling'. See [Self-Ensemble: Mitigating Confidence Mis-calibration for Large Language Models](https://arxiv.org/html/2506.01951v2#:~:text=set,frequencies%20on%20a%20validation%20set). Overconfident predictions are slightly pulled down. Underconfident ones stay roughly the same. See [DORM: Preference Data Weights Optimization for Reward Modeling in LLM Alignment](https://aclanthology.org/2025.findings-emnlp.1237/) as well - in [PDF](https://aclanthology.org/2025.findings-emnlp.1237.pdf).
+- Step 10: There is no such thing as a 'tie' case, especially in human preferences. So we need to possibly get a majority probability for either responses A or B in any test case scenario. See [Aligning Large Language Models with Implicit Preferences from
+ User-Generated Content](https://aclanthology.org/2025.acl-long.384.pdf). Conceptual ideas for this:
+  * [A Survey on Human Preference Learning for Large Language Models](https://arxiv.org/html/2406.11191v1) - Preference signals have different sources and formats (direct human feedback, model-simulated feedback, heuristic/inductive biases) and these impact quality vs scale. The usage of preference signals spans SFT, contrastive preference learning, RLHF, preference-conditioned generation.
+  * [Larger or Smaller Reward Margins to Select Preferences for LLM Alignment?](https://openreview.net/forum?id=ncTwQagrj8) - They propose an alignment potential metric that integrates explicit reward margin (e.g., label/regression gap) and implicit reward margin (model’s current margin) to quantify how “useful” a preference pair is for alignment.
+- Step 11: Added some NLP-based research components. Referencing from cognitive science, machine learning, and NLP evaluation research, [MLHP](https://mlhp.stanford.edu/src/chap1.html) introduces human preference modeling as structured, decomposable cognition — logical structure (truth-conditional) and hedonic structure (human-aligned desirability). Further [Apple research](https://machinelearning.apple.com/research/predicting-preferences) frames predicting preferences as learning a latent preference manifold from implicit feedback — rather than fixed metrics. To define latent proxies (readability, conciseness, mediation) that indirectly map onto user-like judgments. Referencing [https://proceedings.neurips.cc/paper_files/paper/2017/file/d5e2c0adad503c91f91df240d0cd4e49-Paper.pdf](https://proceedings.neurips.cc/paper_files/paper/2017/file/d5e2c0adad503c91f91df240d0cd4e49-Paper.pdf), the ```combined_preference_score``` and ```compare_with_human_bias``` functions in ```nlp_research.py``` are conceptually equivalent to the reward model in RLHF:
+  * The logical score is akin to truthfulness reward.
+  * The human score is akin to helpfulness or readability reward.
+  * The final scalar mixture ```(1 - human_weight) * logical + human_weight * human_pref``` is exactly how RLHF reward functions blend multiple alignment objectives.
+  * This uses analytical proxies for human-likeness.
+
+| Function Cluster                                    | Cognitive Construct                                  | MLHP / Apple Analogy                |
+| --------------------------------------------------- | ---------------------------------------------------- | ----------------------------------- |
+| `semantic_consistency_score`, `contradiction_ratio` | Rational coherence (System 2)                        | Truth-conditional preference        |
+| `readability_score`, `conciseness_sweet_spot_score` | Communicative efficiency (Grice’s Maxim of Quantity) | Human preference clarity            |
+| `mediator_quality_score`                            | Social cognition / empathy                           | Cooperative intent                  |
+| `verbosity_penalty`                                 | Cognitive load minimization                          | Personalized readability preference |
+
 
 ===
 
@@ -123,17 +143,17 @@ sbatch step6_lora_ensemble.sh (16 BIT)
 
 ### Step 7: Quantization
 
-sbatch gptq.sh (4 BIT QUANTIZATION - USED FOR FINAL MODEL)
+sbatch gptq.sh (4 BIT QUANTIZATION - NOT USED FOR FINAL MODEL)
 
-sbatch gptq_8bit.sh (8 BIT QUANTIZATION - NOT USED FOR FINAL MODEL)
+sbatch gptq_8bit.sh (8 BIT QUANTIZATION - USED FOR FINAL MODEL)
 
 ---
 
 ## Inference Solution
 
-### Step 8: Direct TTA inferencing (& possible ensembling) of LoRA adapters (from Folds), or with single LoRa adapter from the best Fold, using quantized 4-bit or 8-bit final models
+### Step 8: Direct TTA inferencing (& possible ensembling) of LoRA adapters (from Folds), or with single LoRa adapter from the best Fold, using the quantized 8-bit final model. Pairwise TTA (symmetrization) also implemented.
 
-### Step 9: TTA Symmetrization Post-processing
+### Step 9: Involving the concept of 'Self-ensembling'. Overconfident predictions are slightly pulled down. Underconfident ones stay roughly the same.
 
 ---
 
