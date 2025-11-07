@@ -156,6 +156,10 @@ sbatch gptq_8bit.sh (8 BIT QUANTIZATION - USED FOR FINAL MODEL)
 
 ### Step 9: Involving the concept of 'Self-ensembling'. Overconfident predictions are slightly pulled down. Underconfident ones stay roughly the same.
 
+### Step 10: Conceptual understanding of preference signals and heuristics
+
+### Step 11: Implementing NLP-research strategies.
+
 ---
 
 ## Winning Solution (did not use the below steps for final model)
