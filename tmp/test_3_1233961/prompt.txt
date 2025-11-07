@@ -1,0 +1,1 @@
+How to initialize the classification head when I do transfer learning. For example, I have a pre-trained vision transformer on ImageNet, and now I want to finetune it on StanfordCars","I want to do full finetuning

@@ -1,0 +1,16 @@
+prompt_path=tmp\test_3_1233961\prompt.txt
+text_a_path=tmp\test_3_1233961\test_a.txt
+text_b_path=tmp\test_3_1233961\test_b.txt
+gold=3
+score_a_task=0.748224
+score_b_task=0.760298
+logical_a=0.534452
+logical_b=0.583706
+answer_correctness_a=1.000000
+answer_correctness_b=1.000000
+human_weight=0.3
+answer_weight=0.4
+logic_a_weight=0.5
+logic_b_weight=0.3
+logic_c_weight=0.2
+winner=B
