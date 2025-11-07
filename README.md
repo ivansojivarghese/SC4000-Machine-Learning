@@ -19,13 +19,13 @@ Step `k`: Winning Solution step [our solution step / difference(s)]
 - Step 4.5: [Calibrate logits with vector scaling]
 - Step 5: Distill logits into Gemma2-9B model [from LLaMa only, 3.6 epochs per fold]
 - Step 6: Ensemble LoRA layers from Folds [3 folds, to 16-bit initial model]
-- Step 7: Quantize final model to 8-bit in GPTQ [4-bit GPTQ]
+- Step 7: Quantize final model to 8-bit in GPTQ [& 4-bit GPTQ]
 
 === End of Winning Solution ===
 
 === Referencing Inference Solution [Inference Gemma-2 9b 4-bit QLoRA](https://www.kaggle.com/code/emiz6413/inference-gemma-2-9b-4-bit-qlora/notebook) ===
 
-- Step 8: Direct TTA inferencing (& possible ensembling) of LoRA adapters (from Folds), or with single LoRa adapter from the best Fold, using quantized 4-bit final model
+- Step 8: Direct TTA inferencing (& possible ensembling) of LoRA adapters (from Folds), or with single LoRa adapter from the best Fold, using quantized 4-bit or 8-bit final models
 - Step 9: TTA Symmetrization Post-processing
 
 ===
@@ -131,7 +131,7 @@ sbatch gptq_8bit.sh (8 BIT QUANTIZATION - NOT USED FOR FINAL MODEL)
 
 ## Inference Solution
 
-### Step 8: Direct TTA inferencing (& possible ensembling) of LoRA adapters (from Folds), or with single LoRa adapter from the best Fold, using quantized 4-bit final model
+### Step 8: Direct TTA inferencing (& possible ensembling) of LoRA adapters (from Folds), or with single LoRa adapter from the best Fold, using quantized 4-bit or 8-bit final models
 
 ### Step 9: TTA Symmetrization Post-processing
 
