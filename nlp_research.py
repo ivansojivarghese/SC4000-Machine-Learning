@@ -431,6 +431,8 @@ def main():
     parser.add_argument('--verbosity-weight', type=float, default=0.5, help='Weight of verbosity penalty impact in human score')
     parser.add_argument('--enable-mediator-quality', action='store_true', help='Boost responses that acknowledge both sides and propose a compromise')
     parser.add_argument('--mediator-weight', type=float, default=0.0, help='Mix-in weight for mediator quality heuristic (0-1)')
+    # Preset bundling for convenience
+    parser.add_argument('--preset', type=str, default='', help='Optional preset: damp_overconfidence_{slight|moderate|aggressive} or damp_overconfidence (alias moderate). Applies grouped human-bias knobs before other weights.')
     args = parser.parse_args()
 
     style_emb = None
@@ -438,6 +440,53 @@ def main():
         style_emb = load_style_embedding_from_file(args.style_ref_file)
 
     # Apply human tuning flags to runtime hparams
+    # If a preset is specified, override incoming args FIRST (can still be adjusted by explicit flags afterwards)
+    def _apply_preset(tag: str):
+        tag = tag.lower()
+        if tag in ('damp_overconfidence', 'damp_overconfidence_moderate'):
+            # Moderate: reduce human weight emphasis; add mediator + light verbosity + conciseness sweet spot
+            args.human_weight = min(args.human_weight, 0.38)
+            args.answer_weight = max(args.answer_weight, 0.58)
+            args.enable_mediator_quality = True
+            args.mediator_weight = max(args.mediator_weight, 0.35)
+            args.enable_concise_sweetspot = True
+            args.concise_target = 130
+            args.concise_lower = 85
+            args.concise_upper = 230
+            args.concise_min_score = 0.60
+            args.enable_verbosity_penalty = True
+            args.verbosity_max_breaks = 5
+            args.verbosity_slope = 0.030
+            args.verbosity_max_penalty = 0.18
+            args.verbosity_weight = 0.30
+        elif tag in ('damp_overconfidence_slight', 'damp_overconfidence_light'):
+            args.human_weight = min(args.human_weight, 0.40)
+            args.answer_weight = max(args.answer_weight, 0.60)
+            args.enable_mediator_quality = True
+            args.mediator_weight = max(args.mediator_weight, 0.25)
+        elif tag in ('damp_overconfidence_aggressive', 'damp_overconfidence_strong'):
+            args.human_weight = min(args.human_weight, 0.40)
+            args.answer_weight = max(args.answer_weight, 0.60)
+            args.enable_mediator_quality = True
+            args.mediator_weight = max(args.mediator_weight, 0.40)
+            args.enable_concise_sweetspot = True
+            args.concise_target = 125
+            args.concise_lower = 85
+            args.concise_upper = 220
+            args.concise_min_score = 0.62
+            args.enable_verbosity_penalty = True
+            args.verbosity_max_breaks = 5
+            args.verbosity_slope = 0.035
+            args.verbosity_max_penalty = 0.22
+            args.verbosity_weight = 0.35
+            # Style anchor optional; if user provided style-ref-file, we optionally bump style weight via human formula adjustments later
+        else:
+            if tag:
+                print(f"[Warn] Unknown preset '{tag}' ignored.")
+
+    if args.preset:
+        _apply_preset(args.preset)
+
     _HPARAMS['enable_concise_sweetspot'] = bool(args.enable_concise_sweetspot)
     _HPARAMS['concise_target'] = int(args.concise_target)
     _HPARAMS['concise_lower'] = int(args.concise_lower)

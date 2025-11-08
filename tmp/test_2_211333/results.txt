@@ -1,13 +1,10 @@
 prompt_path=tmp\test_2_211333\prompt.txt
 text_a_path=tmp\test_2_211333\test_a.txt
 text_b_path=tmp\test_2_211333\test_b.txt
-gold=3
-score_a_task=0.483030
-score_b_task=0.504254
+score_a_task=0.597870
+score_b_task=0.621177
 logical_a=0.655853
 logical_b=0.691897
-answer_correctness_a=0.212900
-answer_correctness_b=0.207692
 human_weight=0.3
 answer_weight=0.4
 logic_a_weight=0.5
