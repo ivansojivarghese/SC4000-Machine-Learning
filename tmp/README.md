@@ -51,15 +51,17 @@ This script performs various NLP research tasks based on the specified mode.
 ```bash
 python nlp_research.py --test_case test_1_136060 --use-human-bias --gold 3
 
+'''
 python nlp_research.py --test_case test_1_136060 --use-human-bias --answer-weight 0.25 --human-weight 0.1 --gold 3
 
 python nlp_research.py --test_case test_1_136060 --use-human-bias --answer-weight 0.275 --human-weight 0.1 --gold 3
 
 python nlp_research.py --test_case test_1_136060 --use-human-bias --answer-weight 0.3 --human-weight 0.1 --gold 3
+'''
 
 # python nlp_research.py --test_case test_2_211333 --use-human-bias --answer-weight 0 --human-weight 0.6 --style-ref-file .\tmp\test_2_211333\test_a.txt
 
-# python nlp_research.py --test_case test_2_211333 --use-human-bias
+python nlp_research.py --test_case test_2_211333 --use-human-bias
 
 # python nlp_research.py --test_case test_2_211333 --use-human-bias --answer-weight 0 --human-weight 0.5 --enable-concise-sweetspot --concise-target 150 --concise-lower 90 --concise-upper 350 --concise-min-score 0.5
 

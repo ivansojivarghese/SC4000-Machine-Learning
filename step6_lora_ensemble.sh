@@ -28,7 +28,7 @@ FOLDS=${FOLDS:-"0,1,2"}
 LORA_DIR_PREFIX=${LORA_DIR_PREFIX:-model_save/distilled_gemma2-9b_fold_}
 OUT_LORA=${OUT_LORA:-model_save/avg_lora}
 OUT_MERGED=${OUT_MERGED:-model_save/final_merged_model}
-SKIP_MERGE=${SKIP_MERGE:-0}
+SKIP_MERGE=${SKIP_MERGE:-1}
 MERGE_DTYPE=${MERGE_DTYPE:-bf16}   # fp32|bf16|fp16
 
 echo "[Step6] Averaging LoRA adapters across folds: $FOLDS -> $OUT_LORA"
