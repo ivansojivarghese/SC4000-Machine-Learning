@@ -1,0 +1,16 @@
+
+[1/5] Loading base model...
+✅ Base model loaded.
+
+[2/5] Attaching LoRA adapter...
+✅ LoRA adapter attached.
+
+[3/5] Merging LoRA adapter into base model...
+✅ Merge complete. Adapter weights are now integrated into the model.
+💾 Saved merged model to model_save/final_merged_model
+
+[4/5] Quantizing merged model to 4-bit (BitsAndBytes NF4)...
+✅ Quantization complete (4-bit NF4).
+💾 Saved quantized model to model_save/final_quantized_model
+
+🎉 All done! Your model is merged and quantized successfully.
