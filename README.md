@@ -441,12 +441,12 @@ $$R = \frac{\text{clamp}(\text{FleschScore}, 0, 100)}{100}$$
   $$C = \min\left(1.0, \frac{L_{\max}}{N_{\text{words}}}\right)$$
   
   *Sweet-spot mode (triangular):*
-  $$C = \begin{cases}
+  $``C = \begin{cases}
   1.0 & \text{if } N = T \\
   C_{\min} + (1 - C_{\min}) \cdot \frac{N - L}{T - L} & \text{if } L < N < T \\
   C_{\min} + (1 - C_{\min}) \cdot \frac{U - N}{U - T} & \text{if } T < N < U \\
   C_{\min} & \text{otherwise}
-  \end{cases}$$
+  \end{cases}``$
   
   where $T$ = target words, $L$ = lower bound, $U$ = upper bound, $C_{\min}$ = minimum score
 
