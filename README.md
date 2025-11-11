@@ -342,7 +342,7 @@ This version uses *fixed neighborhoods* (not random groups):
 
 $$\tilde{p}_i = \beta p_i + (1 - \beta) \frac{1}{|N_i|} \sum_{k \in N_i} p_k$$
 
-where $N_i = \{j : |j - i| < \frac{\text{group\_size}}{2}\}$,
+where $``N_i = \{j : |j - i| < \frac{\text{group\_size}}{2}\}``$,
 
 and $\beta = 0.7$.
 
