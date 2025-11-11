@@ -461,7 +461,7 @@ $$P_{\text{verbosity}} = \min\left(P_{\max}, m \cdot \max(0, B - B_{\max})\right
 - **Mediator Quality Boost:** Heuristic scoring for balanced viewpoint presentation
   - Detects keywords: "both", "compromise", "on one hand", etc.
   - Awards points for biological/identity distinctions
-  - Normalized score: $\min(1.0, \text{cue\_count} / 10)$
+  - Normalized score: $``\min(1.0, \text{cue\_count} / 10)``$
 
 ---
 
