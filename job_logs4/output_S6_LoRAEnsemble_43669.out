@@ -1,0 +1,5 @@
+[Step6] Averaging LoRA adapters across folds: 0,1,2 -> model_save2/avg_lora
+[Step6] Found 3 adapters: ['model_save2/distilled_gemma2-9b_fold_0/adapter_model.safetensors', 'model_save2/distilled_gemma2-9b_fold_1/adapter_model.safetensors', 'model_save2/distilled_gemma2-9b_fold_2/adapter_model.safetensors']
+[Step6] Wrote averaged adapter -> model_save2/avg_lora/adapter_model.safetensors
+[Step6] Copied adapter_config.json from model_save2/distilled_gemma2-9b_fold_0/adapter_config.json -> model_save2/avg_lora/adapter_config.json
+[Step6] SKIP_MERGE=1 -> Not merging. Averaged adapter ready at model_save2/avg_lora

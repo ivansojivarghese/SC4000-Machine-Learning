@@ -54,7 +54,27 @@ FORCE_REGEN = os.environ.get('INFER_FORCE_REGEN','0')=='1'
 CALC_VAL = os.environ.get('INFER_INCLUDE_VAL','1')=='1'
 SAVE_LASTTOK = os.environ.get('INFER_SAVE_LASTTOK','0')=='1'
 LASTTOK_TOPK = int(os.environ.get('INFER_LASTTOK_TOPK','0'))  # 0 means full when saving
+NUM_SHARDS = int(os.environ.get('INFER_TRAIN_SHARDS','1') or '1')
+SHARD_ID = int(os.environ.get('INFER_TRAIN_SHARD_ID','0') or '0')
+SHARD_STRATEGY = os.environ.get('INFER_SHARD_STRATEGY','range')  # 'range' or 'mod'
+WRITE_ENSEMBLE = os.environ.get('INFER_WRITE_ENSEMBLE','0')=='1'
+SUFFIX = os.environ.get('INFER_SUFFIX','')
+MAX_SEQ_LEN = int(os.environ.get('INFER_MAX_SEQ_LEN','1024') or '1024')
+FUSED_PAIRS = os.environ.get('INFER_FUSED_PAIRS','0')=='1'
+PAD_TO_MULT = int(os.environ.get('INFER_PAD_TO_MULTIPLE','8') or '8')
+SAVE_LOGPROBS = os.environ.get('INFER_SAVE_LOGPROBS','1')=='1'
+if NUM_SHARDS > 1 and not SUFFIX:
+    SUFFIX = f"_sh{SHARD_ID}-of-{NUM_SHARDS}"
 print(f"[Step4] SAVE_ROOT={SAVE_ROOT} FOLDS={FOLDS} MODELS={INFER_MODELS} SAVE_LASTTOK={SAVE_LASTTOK} TOPK={LASTTOK_TOPK}")
+if NUM_SHARDS > 1:
+    print(f"[Step4] Sharding enabled: shard_id={SHARD_ID} of {NUM_SHARDS} strategy={SHARD_STRATEGY} suffix='{SUFFIX}' WRITE_ENSEMBLE={WRITE_ENSEMBLE}")
+print(f"[Step4] MAX_SEQ_LEN={MAX_SEQ_LEN} FUSED_PAIRS={FUSED_PAIRS} PAD_TO_MULT={PAD_TO_MULT} SAVE_LOGPROBS={SAVE_LOGPROBS}")
+try:
+    if torch.cuda.is_available():
+        torch.backends.cuda.matmul.allow_tf32 = True
+        torch.set_float32_matmul_precision('high')
+except Exception:
+    pass
 
 def pick_model_dir(prefix: str, fold: int):
     cand = os.path.join(SAVE_ROOT, f'{prefix}_fold_{fold}')
@@ -162,47 +182,92 @@ def compute_pair_loglik(model, tokenizer, prompts, ra_list, rb_list, max_len=102
                 store.append(tok_ll.sum().item())
     return torch.tensor(logp_a), torch.tensor(logp_b)
 
-def compute_pair_loglik_batched(model, tokenizer, prompts, ra_list, rb_list, max_len=1024, batch_size=1, progress_every=100):
-    """Batched log-likelihood computation with progress logging.
-    We tokenize prompt+response in batches for A and then B separately to avoid memory blow-up.
+def compute_pair_loglik_batched(model, tokenizer, prompts, ra_list, rb_list, max_len=1024, batch_size=1, progress_every=100, pad_to_mult=8, fused=False):
+    """Batched log-likelihood with optional fused A/B processing.
+    fused=True: single forward pass per batch for responses A and B (roughly 2x fewer passes).
     """
     n = len(prompts)
     logp_a = torch.empty(n, dtype=torch.float32)
     logp_b = torch.empty(n, dtype=torch.float32)
     model.eval()
     start = time.time()
-    with torch.no_grad():
-        for which, resp_list, target_store in [('A', ra_list, logp_a), ('B', rb_list, logp_b)]:
+    with torch.inference_mode():
+        if not fused:
+            for which, resp_list, target_store in [('A', ra_list, logp_a), ('B', rb_list, logp_b)]:
+                for i in range(0, n, batch_size):
+                    j = i + batch_size
+                    batch_prompts = prompts[i:j]
+                    batch_resps = resp_list[i:j]
+                    full_texts = []
+                    prompt_lens = []
+                    for p, resp in zip(batch_prompts, batch_resps):
+                        full = (p+'\n' if p else '') + resp
+                        full_texts.append(full)
+                        p_ids = tokenizer(p + ('\n' if p else ''), return_tensors='pt', truncation=True, max_length=max_len).input_ids
+                        prompt_lens.append(p_ids.shape[-1])
+                    enc = tokenizer(full_texts, return_tensors='pt', truncation=True, max_length=max_len, padding=True, pad_to_multiple_of=pad_to_mult)
+                    input_ids = enc['input_ids'].to(DEVICE)
+                    attn = enc['attention_mask'].to(DEVICE)
+                    outputs = model(input_ids=input_ids, attention_mask=attn, use_cache=False)
+                    logits = outputs.logits[:, :-1, :]
+                    targets = input_ids[:, 1:]
+                    lls = torch.nn.functional.log_softmax(logits, dim=-1)
+                    for row_idx in range(input_ids.size(0)):
+                        p_len = prompt_lens[row_idx]
+                        resp_slice = slice(max(p_len-1,0), targets.shape[1])
+                        tgt_ids = targets[row_idx:row_idx+1, resp_slice]
+                        tok_ll = lls[row_idx:row_idx+1, resp_slice, :].gather(-1, tgt_ids.unsqueeze(-1)).squeeze(-1)
+                        target_store[i+row_idx] = tok_ll.sum().float().cpu()
+                    if (i // batch_size) % max(1, progress_every) == 0:
+                        done = min(j, n)
+                        elapsed = time.time()-start
+                        rate = done/(elapsed+1e-6)
+                        print(f"[Step4][Progress] Resp{which} batch {done}/{n} ({rate:.2f} ex/s) elapsed={elapsed/60:.1f}m")
+        else:
+            # Fused pass: pack A then B responses
             for i in range(0, n, batch_size):
                 j = i + batch_size
                 batch_prompts = prompts[i:j]
-                batch_resps = resp_list[i:j]
+                ra_resps = ra_list[i:j]
+                rb_resps = rb_list[i:j]
                 full_texts = []
                 prompt_lens = []
-                for p, resp in zip(batch_prompts, batch_resps):
+                for p, resp in zip(batch_prompts, ra_resps):
                     full = (p+'\n' if p else '') + resp
                     full_texts.append(full)
                     p_ids = tokenizer(p + ('\n' if p else ''), return_tensors='pt', truncation=True, max_length=max_len).input_ids
                     prompt_lens.append(p_ids.shape[-1])
-                enc = tokenizer(full_texts, return_tensors='pt', truncation=True, max_length=max_len, padding=True)
+                for p, resp in zip(batch_prompts, rb_resps):
+                    full = (p+'\n' if p else '') + resp
+                    full_texts.append(full)
+                    p_ids = tokenizer(p + ('\n' if p else ''), return_tensors='pt', truncation=True, max_length=max_len).input_ids
+                    prompt_lens.append(p_ids.shape[-1])
+                enc = tokenizer(full_texts, return_tensors='pt', truncation=True, max_length=max_len, padding=True, pad_to_multiple_of=pad_to_mult)
                 input_ids = enc['input_ids'].to(DEVICE)
                 attn = enc['attention_mask'].to(DEVICE)
                 outputs = model(input_ids=input_ids, attention_mask=attn, use_cache=False)
                 logits = outputs.logits[:, :-1, :]
                 targets = input_ids[:, 1:]
                 lls = torch.nn.functional.log_softmax(logits, dim=-1)
-                for row_idx in range(input_ids.size(0)):
-                    p_len = prompt_lens[row_idx]
-                    # slice ensuring p_len-1 >=0
-                    resp_slice = slice(max(p_len-1,0), targets.shape[1])
-                    tgt_ids = targets[row_idx:row_idx+1, resp_slice]
-                    tok_ll = lls[row_idx:row_idx+1, resp_slice, :].gather(-1, tgt_ids.unsqueeze(-1)).squeeze(-1)
-                    target_store[i+row_idx] = tok_ll.sum().float().cpu()
+                half = input_ids.size(0)//2
+                for row_idx in range(half):
+                    # A
+                    p_len_a = prompt_lens[row_idx]
+                    slice_a = slice(max(p_len_a-1,0), targets.shape[1])
+                    tgt_a = targets[row_idx:row_idx+1, slice_a]
+                    tok_ll_a = lls[row_idx:row_idx+1, slice_a, :].gather(-1, tgt_a.unsqueeze(-1)).squeeze(-1)
+                    logp_a[i+row_idx] = tok_ll_a.sum().float().cpu()
+                    # B
+                    p_len_b = prompt_lens[half+row_idx]
+                    slice_b = slice(max(p_len_b-1,0), targets.shape[1])
+                    tgt_b = targets[half+row_idx:half+row_idx+1, slice_b]
+                    tok_ll_b = lls[half+row_idx:half+row_idx+1, slice_b, :].gather(-1, tgt_b.unsqueeze(-1)).squeeze(-1)
+                    logp_b[i+row_idx] = tok_ll_b.sum().float().cpu()
                 if (i // batch_size) % max(1, progress_every) == 0:
                     done = min(j, n)
                     elapsed = time.time()-start
                     rate = done/(elapsed+1e-6)
-                    print(f"[Step4][Progress] Resp{which} fold batch {done}/{n} ({rate:.2f} ex/s) elapsed={elapsed/60:.1f}m")
+                    print(f"[Step4][Progress] Fused batch {done}/{n} ({rate:.2f} ex/s) elapsed={elapsed/60:.1f}m")
     return logp_a, logp_b
 
 def batched_lasttok_repr(model, tokenizer, texts, max_len=512, batch_size=2):
@@ -299,6 +364,23 @@ for fold in FOLDS:
             print(f"[Step4][Subset] Fold {fold}: global sampled {subset_size_global}/{current_n} rows (seed={subset_seed}).")
         else:
             print(f"[Step4][Subset] Fold {fold}: global subset equals train rows ({current_n}).")
+    # Apply sharding after global subset but before per-model subset
+    if NUM_SHARDS > 1:
+        total_n = len(train_df)
+        if total_n == 0:
+            print(f"[Step4][Shard] No rows to shard for fold {fold}.")
+            continue
+        if SHARD_STRATEGY == 'mod':
+            sel = train_df['_orig_idx'] % NUM_SHARDS == SHARD_ID
+            shard_df = train_df[sel].reset_index(drop=True)
+            print(f"[Step4][Shard] Fold {fold}: mod strategy selected {len(shard_df)}/{total_n} rows (id={SHARD_ID} of {NUM_SHARDS}).")
+        else:
+            shard_size = math.ceil(total_n / NUM_SHARDS)
+            start = SHARD_ID * shard_size
+            end = min(total_n, start + shard_size)
+            shard_df = train_df.iloc[start:end].reset_index(drop=True)
+            print(f"[Step4][Shard] Fold {fold}: range strategy rows {start}:{end} -> {len(shard_df)}/{total_n}.")
+        train_df = shard_df
     val_df = load_rows(val_csv) if os.path.isfile(val_csv) else None
 
     model_dirs = {}
@@ -447,9 +529,17 @@ for fold in FOLDS:
         records_train = model_train_df.to_dict('records')
         texts_train = [extract_text(r) for r in records_train]
         print(f"[Step4][Debug] Preparing last-token repr on {len(texts_train)} texts (SAVE_LASTTOK={SAVE_LASTTOK})", flush=True)
-        rep = batched_lasttok_repr(model, tok, texts_train, max_len=min(getattr(tok,'model_max_length',1024),1024))
+        rep = batched_lasttok_repr(
+            model,
+            tok,
+            texts_train,
+            max_len=min(getattr(tok, 'model_max_length', MAX_SEQ_LEN), MAX_SEQ_LEN)
+        )
         if rep is not None:
-            save_obj(f'model_save/teacher_logits/{name}_fold_{fold}_train_lasttok_logits.pt', rep)
+            outp = f"model_save/teacher_logits/{name}_fold_{fold}_train_lasttok_logits.pt"
+            if SUFFIX:
+                outp = outp.replace('.pt', f"{SUFFIX}.pt")
+            save_obj(outp, rep)
 
         if {'response_a','response_b'} <= set(model_train_df.columns):
             prompts = [build_prompt(r) for r in records_train]
@@ -481,17 +571,23 @@ for fold in FOLDS:
             ra_inputs = [str(r.get('response_a','')) for r in records_train]
             rb_inputs = [str(r.get('response_b','')) for r in records_train]
             if batch_sz > 1:
-                print(f"[Step4] Using batched loglik batch_size={batch_sz} progress_every={progress_every}", flush=True)
-                logp_a, logp_b = compute_pair_loglik_batched(model, tok, prompts, ra_inputs, rb_inputs, max_len=1024, batch_size=batch_sz, progress_every=progress_every)
+                print(f"[Step4] Using batched loglik batch_size={batch_sz} fused={FUSED_PAIRS} progress_every={progress_every}", flush=True)
+                logp_a, logp_b = compute_pair_loglik_batched(model, tok, prompts, ra_inputs, rb_inputs, max_len=MAX_SEQ_LEN, batch_size=batch_sz, progress_every=progress_every, pad_to_mult=PAD_TO_MULT, fused=FUSED_PAIRS)
             else:
                 print(f"[Step4] Using non-batched loglik (very slow). Consider setting INFER_LOGPROB_BATCH>1.", flush=True)
-                logp_a, logp_b = compute_pair_loglik(model, tok, prompts, ra_inputs, rb_inputs, max_len=1024)
+                logp_a, logp_b = compute_pair_loglik(model, tok, prompts, ra_inputs, rb_inputs, max_len=MAX_SEQ_LEN)
             logp_t = 0.5*(logp_a + logp_b)
             raw = torch.stack([logp_a, logp_b, logp_t], dim=1)
             probs = torch.softmax(raw, dim=1)
             # Persist with per-model subset awareness: include mapping of original indices if present.
-            save_obj(f'model_save/teacher_logits/{name}_fold_{fold}_train_logprobs.pt', raw)
-            save_obj(f'model_save/teacher_logits/{name}_fold_{fold}_train_probs.pt', probs)
+            outp_raw = f'model_save/teacher_logits/{name}_fold_{fold}_train_logprobs.pt'
+            outp_prb = f'model_save/teacher_logits/{name}_fold_{fold}_train_probs.pt'
+            if SUFFIX:
+                outp_raw = outp_raw.replace('.pt', f'{SUFFIX}.pt')
+                outp_prb = outp_prb.replace('.pt', f'{SUFFIX}.pt')
+            if SAVE_LOGPROBS:
+                save_obj(outp_raw, raw)
+            save_obj(outp_prb, probs)
             orig_idx_series = model_train_df.get('_orig_idx')
             for ridx,(pa,pb,pt) in enumerate(probs.tolist()):
                 oof_rows.append({'fold':fold,'split':'train','model':name,'row_id':ridx,'pA':pa,'pB':pb,'pTie':pt,'orig_idx': int(orig_idx_series.iloc[ridx]) if orig_idx_series is not None else ridx})
@@ -527,16 +623,22 @@ for fold in FOLDS:
             va_inputs = [str(r.get('response_a','')) for r in v_records]
             vb_inputs = [str(r.get('response_b','')) for r in v_records]
             if batch_sz > 1:
-                print(f"[Step4] (val) Using batched loglik batch_size={batch_sz} progress_every={progress_every}", flush=True)
-                v_logp_a, v_logp_b = compute_pair_loglik_batched(model, tok, v_prompts, va_inputs, vb_inputs, max_len=1024, batch_size=batch_sz, progress_every=progress_every)
+                print(f"[Step4] (val) Using batched loglik batch_size={batch_sz} fused={FUSED_PAIRS} progress_every={progress_every}", flush=True)
+                v_logp_a, v_logp_b = compute_pair_loglik_batched(model, tok, v_prompts, va_inputs, vb_inputs, max_len=MAX_SEQ_LEN, batch_size=batch_sz, progress_every=progress_every, pad_to_mult=PAD_TO_MULT, fused=FUSED_PAIRS)
             else:
                 print(f"[Step4] (val) Using non-batched loglik (very slow). Consider setting INFER_LOGPROB_BATCH>1.", flush=True)
-                v_logp_a, v_logp_b = compute_pair_loglik(model, tok, v_prompts, va_inputs, vb_inputs, max_len=1024)
+                v_logp_a, v_logp_b = compute_pair_loglik(model, tok, v_prompts, va_inputs, vb_inputs, max_len=MAX_SEQ_LEN)
             v_logp_t = 0.5*(v_logp_a + v_logp_b)
             v_raw = torch.stack([v_logp_a, v_logp_b, v_logp_t], dim=1)
             v_probs = torch.softmax(v_raw, dim=1)
-            save_obj(f'model_save/teacher_logits/{name}_fold_{fold}_val_logprobs.pt', v_raw)
-            save_obj(f'model_save/teacher_logits/{name}_fold_{fold}_val_probs.pt', v_probs)
+            v_outp_raw = f'model_save/teacher_logits/{name}_fold_{fold}_val_logprobs.pt'
+            v_outp_prb = f'model_save/teacher_logits/{name}_fold_{fold}_val_probs.pt'
+            if SUFFIX:
+                v_outp_raw = v_outp_raw.replace('.pt', f'{SUFFIX}.pt')
+                v_outp_prb = v_outp_prb.replace('.pt', f'{SUFFIX}.pt')
+            if SAVE_LOGPROBS:
+                save_obj(v_outp_raw, v_raw)
+            save_obj(v_outp_prb, v_probs)
             for ridx,(pa,pb,pt) in enumerate(v_probs.tolist()):
                 oof_rows.append({'fold':fold,'split':'val','model':name,'row_id':ridx,'pA':pa,'pB':pb,'pTie':pt})
 
@@ -548,15 +650,30 @@ print('[Step4] Per-model/fold inference done.')
 
 if oof_rows:
     oof_df = pd.DataFrame(oof_rows)
+    # Decide output paths with potential suffix
+    ens_out = ENSEMBLE_OUT
+    oof_out = OOF_TABLE
+    if SUFFIX:
+        if ens_out.endswith('.pt'):
+            ens_out = ens_out.replace('.pt', f'{SUFFIX}.pt')
+        if oof_out.endswith('.parquet'):
+            oof_out = oof_out.replace('.parquet', f'{SUFFIX}.parquet')
+        elif oof_out.endswith('.csv'):
+            oof_out = oof_out.replace('.csv', f'{SUFFIX}.csv')
+        else:
+            oof_out = oof_out + SUFFIX
     basis = oof_df[oof_df.split=='val'] if (oof_df['split']=='val').any() else oof_df
     grp = basis.groupby(['fold','row_id'])[['pA','pB','pTie']].mean().reset_index()
-    torch.save(torch.tensor(grp[['pA','pB','pTie']].values, dtype=torch.float32), ENSEMBLE_OUT)
-    print(f"[Step4][Ensemble] Saved mean probs -> {ENSEMBLE_OUT} shape={(len(grp),3)}")
-    if OOF_TABLE.endswith('.parquet'):
-        oof_df.to_parquet(OOF_TABLE, index=False)
+    # Only write ensemble if shards==1 or explicitly requested
+    if NUM_SHARDS == 1 or WRITE_ENSEMBLE:
+        torch.save(torch.tensor(grp[['pA','pB','pTie']].values, dtype=torch.float32), ens_out)
+        print(f"[Step4][Ensemble] Saved mean probs -> {ens_out} shape={(len(grp),3)}")
+    # Always write OOF table (suffixed if sharded) for later merging
+    if oof_out.endswith('.parquet'):
+        oof_df.to_parquet(oof_out, index=False)
     else:
-        oof_df.to_csv(OOF_TABLE, index=False)
-    print(f"[Step4][OOF] Table -> {OOF_TABLE} rows={len(oof_df)}")
+        oof_df.to_csv(oof_out, index=False)
+    print(f"[Step4][OOF] Table -> {oof_out} rows={len(oof_df)}")
 else:
     print('[Step4][OOF] No rows; nothing saved.')
 
