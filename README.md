@@ -384,7 +384,227 @@ Outcomes:
 
 ### Step 11: Implementing NLP-research strategies.
 
-TO BE ADDED.
+Explanation:
+
+#### NLP Research: Hybrid Text Quality Evaluation Framework
+
+##### Overview
+
+This framework implements a **multi-dimensional scoring system** for evaluating and comparing text outputs from language models. It combines logical consistency, human preference proxies, and task-specific correctness metrics to provide robust text quality assessment.
+
+---
+
+#### Core Scoring Components
+
+##### 1. Logical Consistency Score
+
+Evaluates semantic coherence and internal contradictions using transformer-based models.
+
+$$\text{Logical Score} = \alpha \cdot S_{\text{semantic}} + \beta \cdot (1 - C_{\text{contradiction}})$$
+
+where:
+- $S_{\text{semantic}}$: Average cosine similarity between consecutive sentence embeddings
+- $C_{\text{contradiction}}$: Ratio of contradictory sentence pairs detected by NLI model
+- Default: $\alpha = 0.6$, $\beta = 0.4$
+
+**Models Used:**
+- Sentence embeddings: `all-MiniLM-L6-v2`
+- NLI contradiction detection: `roberta-large-mnli`
+
+**Semantic Consistency:**
+
+$$S_{\text{semantic}} = \frac{1}{N-1} \sum_{i=1}^{N-1} \cos(\mathbf{e}_i, \mathbf{e}_{i+1})$$
+
+where $\mathbf{e}_i$ is the embedding of sentence $i$.
+
+---
+
+##### 2. Human Preference Score
+
+Incorporates readability, conciseness, and style similarity to model human preferences.
+
+$$S_{\text{human}} = 0.4 \cdot R + 0.3 \cdot C + 0.3 \cdot S_{\text{style}}$$
+
+**Components:**
+
+- **Readability** $R$: Flesch Reading Ease score normalized to [0,1]
+  
+$$R = \frac{\text{clamp}(\text{FleschScore}, 0, 100)}{100}$$
+
+- **Conciseness** $C$: Length-based penalty with two modes:
+  
+  *Standard mode:*
+  $$C = \min\left(1.0, \frac{L_{\max}}{N_{\text{words}}}\right)$$
+  
+  *Sweet-spot mode (triangular):*
+  $$C = \begin{cases}
+  1.0 & \text{if } N = T \\
+  C_{\min} + (1 - C_{\min}) \cdot \frac{N - L}{T - L} & \text{if } L < N < T \\
+  C_{\min} + (1 - C_{\min}) \cdot \frac{U - N}{U - T} & \text{if } T < N < U \\
+  C_{\min} & \text{otherwise}
+  \end{cases}$$
+  
+  where $T$ = target words, $L$ = lower bound, $U$ = upper bound, $C_{\min}$ = minimum score
+
+- **Style Similarity** $S_{\text{style}}$: Cosine similarity with reference text
+  
+$$S_{\text{style}} = \frac{\cos(\mathbf{e}_{\text{text}}, \mathbf{e}_{\text{ref}}) + 1}{2}$$
+
+**Optional Adjustments:**
+
+- **Verbosity Penalty:** Linear penalty for excessive line breaks
+  
+$$P_{\text{verbosity}} = \min\left(P_{\max}, m \cdot \max(0, B - B_{\max})\right)$$
+  
+  where $B$ = line break count, $B_{\max}$ = allowed breaks, $m$ = slope
+
+- **Mediator Quality Boost:** Heuristic scoring for balanced viewpoint presentation
+  - Detects keywords: "both", "compromise", "on one hand", etc.
+  - Awards points for biological/identity distinctions
+  - Normalized score: $\min(1.0, \text{cue\_count} / 10)$
+
+---
+
+##### 3. Answer Correctness Score
+
+Evaluates whether the response correctly answers a given prompt against a gold reference.
+
+$$S_{\text{answer}} = \begin{cases}
+1.0 & \text{if exact or numeric match} \\
+0.6 \cdot \max(E, N) + 0.4 \cdot S_{\text{semantic}} & \text{otherwise}
+\end{cases}$$
+
+where:
+- $E$: Exact substring match (binary)
+- $N$: Numeric answer match (binary)
+- $S_{\text{semantic}}$: Embedding similarity between "Answer: {gold}" and response
+
+---
+
+#### Combined Task Score
+
+The final hybrid score integrates all components:
+
+$$S_{\text{final}} = (1 - w_{\text{answer}}) \cdot S_{\text{hybrid}} + w_{\text{answer}} \cdot S_{\text{answer}}$$
+
+where:
+
+$$S_{\text{hybrid}} = (1 - w_{\text{human}}) \cdot S_{\text{logical}} + w_{\text{human}} \cdot S_{\text{human}}$$
+
+**Configurable Weights:**
+- $w_{\text{answer}}$: Task correctness weight (default: 0.4)
+- $w_{\text{human}}$: Human preference weight (default: 0.3)
+- Logical sub-weights: $a = 0.5$, $b = 0.3$, $c = 0.2$ (semantic, contradiction, factuality)
+
+How was this implemented in our solution:
+- in ./tmp folder, see scripts: write_response.py & run_single_pair.py (helper files). Also take note of the test cases and their prompts/answers under each folder.
+- Ran the nlp_research.py script with various parameters to evaluate different test cases and configurations.
+
+For test_1_136060:
+
+```markdown
+prompt_path=tmp\test_1_136060\prompt.txt
+text_a_path=tmp\test_1_136060\test_a.txt
+text_b_path=tmp\test_1_136060\test_b.txt
+gold=3
+score_a_task=0.640567
+score_b_task=0.860696
+logical_a=1.000000
+logical_b=0.753984
+answer_correctness_a=0.229399
+answer_correctness_b=1.000000
+human_weight=0.3
+answer_weight=0.4
+logic_a_weight=0.5
+logic_b_weight=0.3
+logic_c_weight=0.2
+winner=B
+```
+
+For test_2_211333:
+
+```markdown
+prompt_path=tmp\test_2_211333\prompt.txt
+text_a_path=tmp\test_2_211333\test_a.txt
+text_b_path=tmp\test_2_211333\test_b.txt
+score_a_task=0.597870
+score_b_task=0.621177
+logical_a=0.655853
+logical_b=0.691897
+human_weight=0.3
+answer_weight=0.4
+logic_a_weight=0.5
+logic_b_weight=0.3
+logic_c_weight=0.2
+winner=B
+```
+
+For test_3_1233961:
+
+```markdown
+prompt_path=tmp\test_3_1233961\prompt.txt
+text_a_path=tmp\test_3_1233961\test_a.txt
+text_b_path=tmp\test_3_1233961\test_b.txt
+gold=3
+score_a_task=0.748224
+score_b_task=0.760298
+logical_a=0.534452
+logical_b=0.583706
+answer_correctness_a=1.000000
+answer_correctness_b=1.000000
+human_weight=0.3
+answer_weight=0.4
+logic_a_weight=0.5
+logic_b_weight=0.3
+logic_c_weight=0.2
+winner=B
+```
+
+- test_1_136060: Correctly identified winner B
+- test_2_211333: (In)correctly identified winner B (A was actually better)
+- test_3_1233961: Correctly identified winner B
+
+In this approach, tie cases were avoided by design, as the scoring system produces continuous scores that differentiate responses. Humans are designed by nature to choose one response over another, even if differences are subtle.
+
+Using the ```score_a_task``` and ```score_b_task``` outputs from the above runs, we used them in our math_process.py script to evaluate the refined probability scores for submission. Part of this script is in the final inference notebook as well.
+
+After multiple iterations of NLP runs as above, 2 versions of NLP research scoring were implemented:
+- NLPv4: 
+
+```markdown
+rows = {
+    0: (0.640567, 0.860696),
+    1: (0.5979, 0.6212),
+    2: (0.748224, 0.760298),
+}
+```
+
+- NLPv4.1: 
+
+```markdown
+rows = {
+    0: (0.640567, 0.860696),
+    2: (0.748224, 0.760298),
+}
+```
+
+The scores above are directly placed into a regression function derived through mathemical modelling. See the 'README_math_winner_probabilities.md' file in ./docs for more details. The difference between NLPv4 and NLPv4.1 is that test case 2 (211333) was removed from the latter, as it was incorrectly predicting the winner.
+
+NLPv4 output: 
+
+| id | winner_model_a | winner_model_b | winner_tie |
+| ---: | ---: | ---: | ---: |
+| 2 | 1233961 | 0.257928 | 0.566062 | 0.176010 |
+| 0 | 136060 | 0.000237 | 0.986890 | 0.012873 |
+| 1 | 211333 | 0.150965 | 0.693847 | 0.155187 |
+
+NLPv4.1 output:
+
+| id | winner_model_a | winner_model_b | winner_tie |
+| ---: | ---: | ---: | ---: |
+| 2 | 1233961 | 0.257928 | 0.566062 | 0.176010 |
+| 0 | 136060 | 0.000237 | 0.986890 | 0.012873 |
+| 1 | 211333 | from model | from model | from model |
 
 Outcomes:
 - Added various analytical proxies for human-likeness (readability, conciseness, mediation) that indirectly map onto user-like judgments.
