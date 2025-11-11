@@ -15,9 +15,9 @@ Step `k`: Winning Solution step [our solution step / difference(s)]
 - Step 2: Split Kaggle + [33k data](https://www.kaggle.com/competitions/lmsys-chatbot-arena/discussion/500973) into 5 folds [3 folds]
 - Step 2.5: [Remove argmax samples from all 3 folds, data cleaning]
 - Step 3: Train Teacher models on folds for 1 epoch each [just LLaMA only, 0.2 epochs, training subset reduced to 20000 samples]
-- Step 4: Infer logits for all training data [just LLaMa only, training subset reduced to 15000-20000 samples]
+- Step 4: Infer logits for all training data [just LLaMa only, training subset reduced to 15000-20000 samples - further upgraded version with sharding, fused pairs, max seq len, etc. with close to 50k samples]
 - Step 4.5: [Calibrate logits with vector scaling]
-- Step 5: Distill logits into Gemma2-9B model [from LLaMa only, 2.4 epochs per fold]
+- Step 5: Distill logits into Gemma2-9B model [from LLaMa only, 4.2 epochs per fold - downgraded to 2.4 epochs per fold due to limited compute with Step 4 changes]
 - Step 6: Ensemble LoRA layers from Folds [3 folds, to 16-bit initial model]
 - Step 7: Quantize final model to 8-bit in GPTQ [& 4-bit GPTQ]
 
@@ -201,11 +201,77 @@ sbatch gptq_8bit.sh (8 BIT QUANTIZATION - USED FOR FINAL MODEL)
 
 ### Step 8: Direct TTA inferencing (& possible ensembling) of LoRA adapters (from Folds), or with single LoRa adapter from the best Fold, using the quantized 8-bit final model. Pairwise TTA (symmetrization) also implemented.
 
-### Step 9: Involving the concept of 'Self-ensembling'. Overconfident predictions are slightly pulled down. Underconfident ones stay roughly the same.
+What was actually done (for final model):
+- Single LoRa adapter from the best Fold (Fold 0) used with the quantized 8-bit final model.
+- Single LoRa adapter derived from reference [Inference Gemma-2 9b 4-bit QLoRA](https://www.kaggle.com/code/emiz6413/inference-gemma-2-9b-4-bit-qlora/notebook) - but applied to 8-bit quantized model instead of 4-bit. Training details of how this LoRa adapter was derived is [here](https://www.kaggle.com/code/emiz6413/training-gemma-2-9b-4-bit-qlora-fine-tuning?scriptVersionId=187770530).
+  * Reference used 4-bit quantized Gemma 2 9b Instruct uploaded by [unsloth](https://huggingface.co/unsloth/gemma-2-9b-it-bnb-4bit) team as a base-model and added LoRA adapters and trained for 1 epoch.
 
-### Step 10: Conceptual understanding of preference signals and heuristics
+Explanation:
+
+#### What LoRA Does
+
+- In **standard fine-tuning**, all model weights $W$ are updated:
+
+$$W \leftarrow W - \eta \frac{\partial L}{\partial W} = W + \Delta W$$
+
+- **LoRA (Low-Rank Adaptation)** approximates this weight update $\Delta W$ using two small matrices:
+
+$$\Delta W \approx BA$$
+
+where:
+
+- $A \in \mathbb{R}^{r \times k}$
+- $B \in \mathbb{R}^{d \times r}$
+- $r \ll \min(d, k)$
+
+- Only $A$ and $B$ are trained; the original pretrained weights $W$ are **frozen**.
+
+#### During Training (left side of the image)
+
+- The model output is computed as:
+
+$$h = Wx + BAx$$
+
+- $W$ is frozen, $A$ and $B$ are trainable.
+- $A$ is initialized with small random values, $B$ is initialized as zeros.
+- This drastically reduces the number of trainable parameters (e.g., <1% of full model).
+
+#### After Training (right side of the image)
+
+- The trained adapter contribution $BA$ can be **merged** into the original weights:
+
+$$W_{\text{merged}} = W + BA$$
+
+- The merged model behaves as if it were fully fine-tuned, but required much less compute and memory to train.
+
+#### What QLoRA Adds
+
+- QLoRA (Quantized LoRA) goes one step further by quantizing the large model’s frozen weights to lower precision (4-bit or 8-bit).
+- Only the LoRA adapters remain in higher precision (typically 16-bit).
+- This reduces GPU memory usage by 4–8×, enabling fine-tuning of huge models (e.g., 8B+ parameters) on smaller GPUs.
+- Forward and backward passes still use higher precision math for stability.
+
+#### Example Efficiency
+
+- A full 8B model (in 32-bit) ≈ 32 GB VRAM.
+- Quantized 8-bit model ≈ 8 GB VRAM.
+- Quantized 4-bit model ≈ 4 GB VRAM.
+- In practice: 4-bit QLoRA trains faster (15 h on A6000) than 8-bit (24 h), with minimal performance loss.
+
+The reference LoRa adapter was trained on a much more powerful setup (A100 80GB GPUs) using 4-bit quantized Gemma 2 9B Instruct as base model, and trained for 1 epoch. Our setup (which used V100 32GB GPUs) could not handle this within reasonable time, so we used the derived LoRa adapter directly for inference with our 8-bit quantized final model.
+
+---
+
+### Steps 9-10: Involving the concept of 'Self-ensembling'. Overconfident predictions are slightly pulled down. Underconfident ones stay roughly the same. Conceptual understanding of preference signals and heuristics
+
+Outcomes:
+- Overconfident predictions (e.g., 0.95) are slightly reduced (e.g., to 0.90), etc.
+- However, final private score did not improve with this step, so not used for final model.
 
 ### Step 11: Implementing NLP-research strategies.
+
+Outcomes:
+- Added various analytical proxies for human-likeness (readability, conciseness, mediation) that indirectly map onto user-like judgments.
 
 ---
 
