@@ -17,7 +17,7 @@ Step `k`: Winning Solution step [our solution step / difference(s)]
 - Step 3: Train Teacher models on folds for 1 epoch each [just LLaMA only, 0.2 epochs, training subset reduced to 20000 samples]
 - Step 4: Infer logits for all training data [just LLaMa only, training subset reduced to 15000-20000 samples]
 - Step 4.5: [Calibrate logits with vector scaling]
-- Step 5: Distill logits into Gemma2-9B model [from LLaMa only, 4.2 epochs per fold]
+- Step 5: Distill logits into Gemma2-9B model [from LLaMa only, 2.4 epochs per fold]
 - Step 6: Ensemble LoRA layers from Folds [3 folds, to 16-bit initial model]
 - Step 7: Quantize final model to 8-bit in GPTQ [& 4-bit GPTQ]
 
@@ -120,7 +120,7 @@ INFER_FOLDS=1 INFER_MODELS=llama INFER_PREFER_LORA=1 INFER_LLAMA_SUBSET=15000-20
 
 INFER_FOLDS=2 INFER_MODELS=llama INFER_PREFER_LORA=1 INFER_LLAMA_SUBSET=15000-20000 INFER_LOGPROB_BATCH=8 INFER_PROGRESS_EVERY=5 sbatch step4_infer_teacher_logits.sh
 
--
+#### More upgraded version of Step 4 (with shard strategy, fused pairs, max seq len, etc.)
 
 INFER_FOLDS=0 \
 INFER_MODELS=llama \
@@ -175,7 +175,7 @@ sbatch calibrate_vector_scaling.sh (OPTIONAL TO RUN)
 
 ---
 
-### Step 5: Each Fold trained for 4.2 epochs (7000 steps)
+### Step 5: Each Fold trained for 2.4 epochs (4000 steps)
 
 FOLDS=0 sbatch step5_distill_student.sh
 
