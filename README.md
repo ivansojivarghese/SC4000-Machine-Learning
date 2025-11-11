@@ -201,10 +201,11 @@ sbatch gptq_8bit.sh (8 BIT QUANTIZATION - USED FOR FINAL MODEL)
 
 ### Step 8: Direct TTA inferencing (& possible ensembling) of LoRA adapters (from Folds), or with single LoRa adapter from the best Fold, using the quantized 8-bit final model. Pairwise TTA (symmetrization) also implemented.
 
-What was actually done (for final model):
-- Single LoRa adapter from the best Fold (Fold 0) used with the quantized 8-bit final model.
+What was actually done (for final model): 
 - Single LoRa adapter derived from reference [Inference Gemma-2 9b 4-bit QLoRA](https://www.kaggle.com/code/emiz6413/inference-gemma-2-9b-4-bit-qlora/notebook) - but applied to 8-bit quantized model instead of 4-bit. Training details of how this LoRa adapter was derived is [here](https://www.kaggle.com/code/emiz6413/training-gemma-2-9b-4-bit-qlora-fine-tuning?scriptVersionId=187770530).
   * Reference used 4-bit quantized Gemma 2 9b Instruct uploaded by [unsloth](https://huggingface.co/unsloth/gemma-2-9b-it-bnb-4bit) team as a base-model and added LoRA adapters and trained for 1 epoch.
+- Single LoRa adapters from Folds derived in Step 5 comes close in performance to the highly trained version as above. However, they were unreliable.
+- TTA inferencing and (pairwise symmetrization) improved the final scores. Ensembling of LoRa adapters from Folds, or ensembling of TTA outputs (and symmetrization) from individual adapters, resulted in memory issues and was not feasible.
 
 Explanation:
 
@@ -264,11 +265,126 @@ The reference LoRa adapter was trained on a much more powerful setup (A100 80GB 
 
 ### Steps 9-10: Involving the concept of 'Self-ensembling'. Overconfident predictions are slightly pulled down. Underconfident ones stay roughly the same. Conceptual understanding of preference signals and heuristics
 
+Explanation:
+
+Even after ensembling or TTA, model outputs (probas) can still:
+- Be overconfident (sharp probabilities near 0 or 1), or
+- Contain noisy local variations between similar samples.
+
+So the idea is to perform a local averaging across samples that are nearby in prediction space or sequence order — akin to self-distillation, but applied post hoc to logits.
+
+This resembles:
+
+- Self-Ensemble Calibration (SEC): smoothing predictions using local neighborhoods to reduce variance.
+(see Self-Ensemble Calibration for Deep Neural Networks, arXiv:2506.01951)
+- Temporal smoothing / neighbor regularization ideas from test-time augmentation and model calibration research.
+
+#### First Function — Random Group Averaging (Monte Carlo Ensemble)
+
+```python
+def self_ensemble(probas, group_size=2, n_rounds=3):
+    n = len(probas)
+    all_outputs = np.zeros_like(probas)
+    for _ in range(n_rounds):
+        indices = np.random.permutation(n)
+        groups = [indices[i:i+group_size] for i in range(0, n, group_size)]
+        smoothed = np.zeros_like(probas)
+        for g in groups:
+            group_mean = probas[g].mean(axis=0)
+            smoothed[g] = 0.5 * probas[g] + 0.5 * group_mean
+        all_outputs += smoothed
+    return all_outputs / n_rounds
+```
+
+Let $p_i \in \mathbb{R}^C$ be the probability vector for sample $i$ ($C$ = #classes).
+
+For each random grouping $G_j \subseteq \{1, \ldots, n\}$:
+
+$$\tilde{p}_i = \alpha p_i + (1 - \alpha) \frac{1}{|G_j|} \sum_{k \in G_j} p_k, \quad i \in G_j$$
+
+with $\alpha = 0.5$ here.
+
+This means each prediction is a **blend** of its own and its local group's mean.
+
+The final output averages over multiple random groupings:
+
+$$p_i^{\text{final}} = \frac{1}{R} \sum_{r=1}^{R} \tilde{p}_i^{(r)}$$
+
+where R = \textit{rounds}.
+
+##### Intuition
+
+- Randomly partitions the dataset multiple times into small "ensembles" of size `group_size`.
+- Each ensemble acts as a mini-smoother: predictions in the same group are averaged slightly.
+- Averaging across random partitions reduces variance while maintaining diversity — like Monte Carlo dropout but done at prediction level.
+
+**Result:**
+
+- Reduces prediction noise
+- Slightly improves calibration (ECE, Brier)
+- Often improves leaderboard stability for small test sets.
+
+#### Second Function — Local Neighborhood Smoothing
+
+```python
+def self_ensemble_per_sample(probas: np.ndarray, group_size: int = 8) -> np.ndarray:
+    n = len(probas)
+    smoothed = probas.copy().astype(np.float32)
+    for i in range(n):
+        start = max(0, i - group_size // 2)
+        end = min(n, i + group_size // 2)
+        local_mean = probas[start:end].mean(axis=0)
+        smoothed[i] = 0.7 * probas[i] + 0.3 * local_mean
+    return smoothed / smoothed.sum(axis=1, keepdims=True)
+```
+
+This version uses *fixed neighborhoods* (not random groups):
+
+$$\tilde{p}_i = \beta p_i + (1 - \beta) \frac{1}{|N_i|} \sum_{k \in N_i} p_k$$
+
+where $N_i = \{j : |j - i| < \frac{\text{group\_size}}{2}\}$,
+
+and $\beta = 0.7$.
+
+Finally, it re-normalizes:
+
+$$p_i^{\text{final}} = \frac{\tilde{p}_i}{\sum_c \tilde{p}_{i,c}}$$
+
+##### Intuition
+
+- Each prediction is locally averaged with its temporal neighbors.
+- If your test samples are ordered (e.g., adjacent prompts, nearby sequences, related topics), this exploits that continuity.
+- It's like a **1D smoothing filter** in the probability space.
+
+#### Relation to Calibration Theory
+
+This smoothing acts like:
+
+- **Shrinkage** toward the mean:
+
+$$p_i' = (1 - \lambda)p_i + \lambda\bar{p}$$
+
+which reduces entropy bias and overconfidence.
+
+- **Regularization** of posterior variance:
+  - Encourages more stable probability mass distribution.
+  - Reduces sharp confidence peaks from noise.
+
+In calibration metrics:
+
+- **ECE (Expected Calibration Error)** ↓
+- **NLL / Brier Score** ↓
+- Accuracy often stays similar or slightly improves.
+
 Outcomes:
 - Overconfident predictions (e.g., 0.95) are slightly reduced (e.g., to 0.90), etc.
 - However, final private score did not improve with this step, so not used for final model.
 
+---
+
 ### Step 11: Implementing NLP-research strategies.
+
+
 
 Outcomes:
 - Added various analytical proxies for human-likeness (readability, conciseness, mediation) that indirectly map onto user-like judgments.
