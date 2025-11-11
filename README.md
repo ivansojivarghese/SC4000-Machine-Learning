@@ -122,6 +122,10 @@ INFER_FOLDS=2 INFER_MODELS=llama INFER_PREFER_LORA=1 INFER_LLAMA_SUBSET=15000-20
 
 #### More upgraded version of Step 4 (with shard strategy, fused pairs, max seq len, etc.)
 
+```INFER_TRAIN_SHARDS=5 INFER_TRAIN_SHARD_ID=0 INFER_SHARD_STRATEGY=range \```
+
+INFER_TRAIN_SHARD_ID=k, where k = 0, 1, 2, 3, 4 for 5 shards in total.
+
 INFER_FOLDS=0 \
 INFER_MODELS=llama \
 INFER_PREFER_LORA=1 \
