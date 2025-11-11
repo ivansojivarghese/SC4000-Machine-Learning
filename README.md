@@ -384,10 +384,12 @@ Outcomes:
 
 ### Step 11: Implementing NLP-research strategies.
 
-
+TO BE ADDED.
 
 Outcomes:
 - Added various analytical proxies for human-likeness (readability, conciseness, mediation) that indirectly map onto user-like judgments.
+- NLPv4.1 = -0.00002 from original private score as evaluated on Kaggle LB.
+- NLPv4 = -0.0001 from original private score as evaluated on Kaggle LB.
 
 ---
 
