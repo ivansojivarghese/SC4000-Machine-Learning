@@ -1,0 +1,13 @@
+[Step4] SAVE_ROOT=/scratch-shared/tc1proj005/folds FOLDS=[0] MODELS=['llama'] SAVE_LASTTOK=False TOPK=0
+[Step4] Sharding enabled: shard_id=3 of 5 strategy=range suffix='_sh3-of-5' WRITE_ENSEMBLE=False
+[Step4] MAX_SEQ_LEN=768 FUSED_PAIRS=True PAD_TO_MULT=8 SAVE_LOGPROBS=False
+[Step4] Loaded data/fold_data/fold_0_train.csv rows=59505 cols=9
+[Step4][Shard] Fold 0: range strategy rows 35703:47604 -> 11901/59505.
+[Step4] Loaded data/fold_data/fold_0_val.csv rows=19159 cols=9
+[Step4] Loading llama fold 0 from LoRA /scratch-shared/tc1proj005/folds/llama_fold_0_lora + base /scratch-shared/tc1proj005/post_pretrain_llama3-8b_merged
+[Step4][Info] Tokenizer source for llama fold 0: /scratch-shared/tc1proj005/folds/llama_fold_0_lora
+[Step4][Info] Accelerate device_map detected; skipping explicit model.to().
+[Step4][Subset] llama fold 0: requested 50000 > available 11901. Using full set.
+[Step4][Debug] Preparing last-token repr on 11901 texts (SAVE_LASTTOK=False)
+[Step4][Debug] Starting TRAIN log-likelihood (N=11901), batch_size=8, progress_every=50
+[Step4] Using batched loglik batch_size=8 fused=True progress_every=50
