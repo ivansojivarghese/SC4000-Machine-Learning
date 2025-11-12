@@ -605,17 +605,17 @@ NLPv4 output:
 
 | id | winner_model_a | winner_model_b | winner_tie |
 | ---: | ---: | ---: | ---: |
-| 2 | 1233961 | 0.257928 | 0.566062 | 0.176010 |
-| 0 | 136060 | 0.000237 | 0.986890 | 0.012873 |
-| 1 | 211333 | 0.150965 | 0.693847 | 0.155187 |
+| 1233961 | 0.257928 | 0.566062 | 0.176010 |
+| 136060 | 0.000237 | 0.986890 | 0.012873 |
+| 211333 | 0.150965 | 0.693847 | 0.155187 |
 
 NLPv4.1 output:
 
 | id | winner_model_a | winner_model_b | winner_tie |
 | ---: | ---: | ---: | ---: |
-| 2 | 1233961 | 0.257928 | 0.566062 | 0.176010 |
-| 0 | 136060 | 0.000237 | 0.986890 | 0.012873 |
-| 1 | 211333 | from model | from model | from model |
+| 1233961 | 0.257928 | 0.566062 | 0.176010 |
+| 136060 | 0.000237 | 0.986890 | 0.012873 |
+| 211333 | from model | from model | from model |
 
 Outcomes:
 - Added various analytical proxies for human-likeness (readability, conciseness, mediation) that indirectly map onto user-like judgments.
