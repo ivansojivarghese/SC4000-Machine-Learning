@@ -49,14 +49,6 @@ BASED LARGE LANGUAGE MODEL ALIGNMENT](https://openreview.net/pdf/c86736447d5c66d
 | `mediator_quality_score`                            | Social cognition / empathy                           | Cooperative intent                  |
 | `verbosity_penalty`                                 | Cognitive load minimization                          | Personalized readability preference |
 
-
-===
-
-=== Below Steps of Winning Solution not used for final model ===
-
-- Step 8: Apply TTA during inference
-- Step 9: Evaluate CV and LB
-
 ===
 
 HF_token: REDACTED
@@ -161,7 +153,7 @@ INFER_FOLDS=2 \
 INFER_MODELS=llama \
 INFER_PREFER_LORA=1 \
 INFER_LLAMA_SUBSET=50000 \
-INFER_TRAIN_SHARDS=5 INFER_TRAIN_SHARD_ID=3 INFER_SHARD_STRATEGY=range \
+INFER_TRAIN_SHARDS=5 INFER_TRAIN_SHARD_ID=4 INFER_SHARD_STRATEGY=range \
 INFER_FUSED_PAIRS=1 \
 INFER_MAX_SEQ_LEN=768 \
 INFER_PAD_TO_MULTIPLE=8 \
@@ -629,20 +621,6 @@ Outcomes:
 - Added various analytical proxies for human-likeness (readability, conciseness, mediation) that indirectly map onto user-like judgments.
 - NLPv4.1 = -0.00002 from original private score as evaluated on Kaggle LB.
 - NLPv4 = -0.0001 from original private score as evaluated on Kaggle LB.
-
----
-
-## Winning Solution (did not use the below steps for final model)
-
-### Step 8:
-
-sbatch step8_infer_tta.sh (OPTIONAL TO RUN)
-
----
-
-### Step 9:
-
-sbatch step9_eval.sh (OPTIONAL TO RUN)
 
 ---
 
