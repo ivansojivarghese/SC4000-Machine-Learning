@@ -118,7 +118,7 @@ def _load_extra_csv(path: str) -> pd.DataFrame:
     return df[['prompt', 'response_a', 'response_b', 'label', 'base_idx']]
 
 
-def load_dataset(train_csv: str, max_samples: Optional[int] = None, extra_csvs: Optional[List[str]] = None, shuffle_ab: bool = False, dedup_by_prompt: bool = False) -> Dataset:
+def load_dataset(train_csv: str, max_samples: Optional[int] = None, extra_csvs: Optional[List[str]] = None, shuffle_ab: bool = True, dedup_by_prompt: bool = False) -> Dataset:
     base_df = _load_base_csv_with_idx(train_csv)
     dfs = [base_df]
     if extra_csvs:
@@ -419,7 +419,7 @@ def train_student_distill(
     early_stopping_patience: int = 2,
     max_length: int = 512,
     extra_csvs: Optional[List[str]] = None,
-    shuffle_ab: bool = False,
+    shuffle_ab: bool = True,
     dedup_by_prompt: bool = False,
     use_fast_tokenizer: bool = True,
     dataloader_num_workers: int = 0,
