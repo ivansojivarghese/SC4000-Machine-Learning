@@ -17,6 +17,7 @@ Step `k`: Winning Solution step [our solution step / difference(s)]
 - Step 3: Train Teacher models on folds for 1 epoch each [just LLaMA only, 0.2 epochs, training subset reduced to 20000 samples]
 - Step 4: Infer logits for all training data [just LLaMa only, training subset reduced to 15000-20000 samples - further upgraded version with sharding, fused pairs, max seq len, etc. with close to 50k samples]
 - Step 4.5: [Calibrate logits with vector scaling]
+- Step 4.6: [Merge teacher shards if using shard strategy in Step 4]
 - Step 5: Distill logits into Gemma2-9B model [from LLaMa only, 4.2 epochs per fold - downgraded to 1.2 epochs per fold due to limited compute with Step 4 changes]
 - Step 6: Ensemble LoRA layers from Folds [3 folds, to 16-bit initial model]
 - Step 7: Quantize final model to 8-bit in GPTQ [& 4-bit GPTQ]
@@ -176,6 +177,20 @@ sbatch step4_infer_teacher_logits.sh
 ### Step 4.5:
 
 sbatch calibrate_vector_scaling.sh (OPTIONAL TO RUN)
+
+---
+
+### Step 4.6: Merge teacher shards (if using shard strategy in Step 4)
+
+FOLD=0 MODELS=llama SHARDS=5 RECOMPUTE_ENSEMBLE=1 PREFER_PARQUET=1 sbatch merge_teacher_shards.sh
+
+FOLD=1 MODELS=llama SHARDS=5 RECOMPUTE_ENSEMBLE=1 PREFER_PARQUET=1 sbatch merge_teacher_shards.sh
+
+FOLD=2 MODELS=llama SHARDS=5 RECOMPUTE_ENSEMBLE=1 PREFER_PARQUET=1 sbatch merge_teacher_shards.sh
+
+OR
+
+MODELS=llama SHARDS=5 RECOMPUTE_ENSEMBLE=1 PREFER_PARQUET=1 sbatch --array=0-2 merge_teacher_shards.sh
 
 ---
 
