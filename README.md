@@ -188,11 +188,11 @@ MODELS=llama SHARDS=5 RECOMPUTE_ENSEMBLE=1 PREFER_PARQUET=1 sbatch --array=0-2 m
 
 ### Step 5: Each Fold trained for 2.4 epochs (4000 steps), 1.2 epochs (2000 steps) due to limited compute with Step 4 changes
 
-FOLDS=0 sbatch step5_distill_student.sh
+FOLDS=0 OOF_SELECTOR=auto sbatch step5_distill_student.sh
 
-FOLDS=1 sbatch step5_distill_student.sh
+FOLDS=1 OOF_SELECTOR=auto sbatch step5_distill_student.sh
 
-FOLDS=2 sbatch step5_distill_student.sh
+FOLDS=2 OOF_SELECTOR=auto sbatch step5_distill_student.sh
 
 ### Step 6:
 

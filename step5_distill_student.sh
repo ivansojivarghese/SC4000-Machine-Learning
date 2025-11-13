@@ -34,7 +34,41 @@ export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 echo "[Step5] Distilling fold ${FOLD} using LLaMA-only OOF probs"
 
-OOF_PATH=${INFER_OOF_TABLE:-model_save/teacher_logits/oof_probs.parquet}
+# Select teacher OOF path format based on available files or an explicit selector.
+# Options via env OOF_SELECTOR: auto | global | fold-merged | fold-fallback
+# - auto (default): prefer per-fold merged parquet, then per-fold fallback-from-train, else global
+# - global: use model_save/teacher_logits/oof_probs.parquet
+# - fold-merged: use model_save/teacher_logits/oof_probs_fold${FOLD}_merged.parquet
+# - fold-fallback: use model_save/teacher_logits/oof_probs_fold${FOLD}_from_train_probs.parquet
+OOF_SELECTOR=${OOF_SELECTOR:-auto}
+if [ -n "${INFER_OOF_TABLE:-}" ]; then
+  OOF_PATH="${INFER_OOF_TABLE}"
+else
+  CAND_FOLD_MERGED="model_save/teacher_logits/oof_probs_fold${FOLD}_merged.parquet"
+  CAND_FOLD_FALLBACK="model_save/teacher_logits/oof_probs_fold${FOLD}_from_train_probs.parquet"
+  CAND_GLOBAL="model_save/teacher_logits/oof_probs.parquet"
+  case "$OOF_SELECTOR" in
+    fold-merged)
+      OOF_PATH="$CAND_FOLD_MERGED"
+      ;;
+    fold-fallback)
+      OOF_PATH="$CAND_FOLD_FALLBACK"
+      ;;
+    global)
+      OOF_PATH="$CAND_GLOBAL"
+      ;;
+    auto|*)
+      if [ -f "$CAND_FOLD_MERGED" ]; then
+        OOF_PATH="$CAND_FOLD_MERGED"
+      elif [ -f "$CAND_FOLD_FALLBACK" ]; then
+        OOF_PATH="$CAND_FOLD_FALLBACK"
+      else
+        OOF_PATH="$CAND_GLOBAL"
+      fi
+      ;;
+  esac
+fi
+echo "[Step5] Using teacher OOF table: $OOF_PATH (selector=$OOF_SELECTOR)"
 FOLD_TRAIN_CSV=data/fold_data/fold_${FOLD}_train.csv
 # RESUME_CHECKPOINT=model_save/distilled_gemma2-9b_fold_${FOLD}/checkpoint-1000
 STUDENT_MODEL=${STUDENT_MODEL_NAME:-google/gemma-2-9b-it}
@@ -49,7 +83,7 @@ MSE_W=${STUDENT_MSE_WEIGHT:-0.05}
 LABEL_SMOOTH=${STUDENT_LABEL_SMOOTH:-0.05}
 MAXLEN=${STUDENT_MAXLEN:-384}
 # Leave STUDENT_MAX_STEPS unset to run purely by epochs; set to a positive int to cap by steps
-MAX_STEPS=${STUDENT_MAX_STEPS:-7000}
+MAX_STEPS=${STUDENT_MAX_STEPS:-2000}
 RESUME_CHECKPOINT=${RESUME_CHECKPOINT:-}
 OVERWRITE=${STUDENT_OVERWRITE:-0}
 # Early stopping patience (in evaluation events). With evaluation_strategy=epoch, this is epochs without improvement.
