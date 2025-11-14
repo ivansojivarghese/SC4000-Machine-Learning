@@ -1,0 +1,6 @@
+[MergeJob] fold=1 models=llama shards=5 dir=model_save/teacher_logits recompute=1 parquet=1
+[Merge] fold=1 models=['llama'] shards=5 dir=model_save/teacher_logits
+[Merge] Saved train_probs merged tensor -> model_save/teacher_logits/llama_fold_1_train_probs_merged.pt shape=(59505, 3) (from 5 shards)
+[Merge] OOF table merged -> model_save/teacher_logits/oof_probs_fold1_merged.parquet rows=11901
+[Merge] Recomputed ensemble -> model_save/teacher_logits/ensemble_oof_probs_fold1_merged.pt shape=(11901, 3)
+[MergeJob] Done

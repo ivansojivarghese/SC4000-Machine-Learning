@@ -1,0 +1,20 @@
+[Step5] Distilling fold 0 using LLaMA-only OOF probs
+[Step5] Using teacher OOF table: model_save/teacher_logits/oof_probs_fold0_merged.parquet (selector=auto)
+[Step5] Step-capped training: --max_steps=1000 will limit total steps (overrides epochs)
+[Step5] Eval strategy=steps steps | Save strategy=steps (save_steps=200) | logging_steps=100
+{'loss': 13.6423, 'grad_norm': 35.12489700317383, 'learning_rate': 4.792553191489362e-05, 'epoch': 0.06}
+{'loss': 11.2406, 'grad_norm': 70.27083587646484, 'learning_rate': 4.2606382978723406e-05, 'epoch': 0.12}
+{'loss': 10.9586, 'grad_norm': 111.22335052490234, 'learning_rate': 3.728723404255319e-05, 'epoch': 0.18}
+{'loss': 10.7228, 'grad_norm': 25.990264892578125, 'learning_rate': 3.1968085106382976e-05, 'epoch': 0.24}
+{'loss': 10.7315, 'grad_norm': 25.919418334960938, 'learning_rate': 2.664893617021277e-05, 'epoch': 0.3}
+{'loss': 10.6213, 'grad_norm': 21.463533401489258, 'learning_rate': 2.1329787234042554e-05, 'epoch': 0.36}
+{'loss': 10.5792, 'grad_norm': 56.7283935546875, 'learning_rate': 1.6010638297872342e-05, 'epoch': 0.42}
+{'loss': 10.6175, 'grad_norm': 15.75719928741455, 'learning_rate': 1.0691489361702128e-05, 'epoch': 0.48}
+{'loss': 10.4953, 'grad_norm': 73.34595489501953, 'learning_rate': 5.372340425531915e-06, 'epoch': 0.54}
+{'loss': 10.4677, 'grad_norm': 20.586275100708008, 'learning_rate': 5.319148936170213e-08, 'epoch': 0.6}
+{'train_runtime': 14685.9666, 'train_samples_per_second': 2.179, 'train_steps_per_second': 0.068, 'train_loss': 11.00766943359375, 'epoch': 0.6}
+[Distill][Eval] step=1000 epoch=0.60 eval_loss=2.6223 eval_log_loss=1.7814 acc=0.4213
+{'eval': {'eval_loss': 2.6222901344299316, 'eval_log_loss': 1.781422736745516, 'eval_accuracy': 0.42127373550663755, 'eval_runtime': 829.3614, 'eval_samples_per_second': 7.175, 'eval_steps_per_second': 0.897, 'epoch': 0.5974607916355489}}
+[Step5] Exporting classifier head to model_save/distilled_gemma2-9b_fold_0/classifier_head.pt
+{'saved': 'model_save/distilled_gemma2-9b_fold_0/classifier_head.pt'}
+[Step5] Done fold 0 -> model_save/distilled_gemma2-9b_fold_0

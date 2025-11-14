@@ -1,0 +1,18 @@
+[Step5] Distilling fold 0 using LLaMA-only OOF probs
+[Step5] Using teacher OOF table: model_save/teacher_logits/oof_probs_fold0_merged.parquet (selector=auto)
+[Step5] Step-capped training: --max_steps=2000 will limit total steps (overrides epochs)
+[Step5] Eval strategy=steps steps | Save strategy=steps (save_steps=200) | logging_steps=100
+{'loss': 10.5375, 'grad_norm': 23.854665756225586, 'learning_rate': 2.396276595744681e-05, 'epoch': 0.66}
+{'loss': 10.6661, 'grad_norm': 31.224836349487305, 'learning_rate': 2.1303191489361703e-05, 'epoch': 0.72}
+{'loss': 10.6995, 'grad_norm': 57.92436218261719, 'learning_rate': 1.8643617021276596e-05, 'epoch': 0.78}
+{'loss': 10.5207, 'grad_norm': 40.229278564453125, 'learning_rate': 1.5984042553191488e-05, 'epoch': 0.84}
+{'loss': 10.5531, 'grad_norm': 28.186477661132812, 'learning_rate': 1.3324468085106384e-05, 'epoch': 0.9}
+{'loss': 10.5165, 'grad_norm': 41.876434326171875, 'learning_rate': 1.0664893617021277e-05, 'epoch': 0.96}
+{'loss': 10.4928, 'grad_norm': 42.8973388671875, 'learning_rate': 8.005319148936171e-06, 'epoch': 1.02}
+{'loss': 10.3461, 'grad_norm': 33.66562271118164, 'learning_rate': 5.345744680851064e-06, 'epoch': 1.08}
+{'loss': 10.3975, 'grad_norm': 53.79865264892578, 'learning_rate': 2.6861702127659577e-06, 'epoch': 1.14}
+{'loss': 10.3791, 'grad_norm': 31.621408462524414, 'learning_rate': 2.6595744680851065e-08, 'epoch': 1.2}
+{'train_runtime': 14814.6731, 'train_samples_per_second': 4.32, 'train_steps_per_second': 0.135, 'train_loss': 5.255438537597656, 'epoch': 1.2}
+[Distill][Eval] step=2000 epoch=1.20 eval_loss=2.6060 eval_log_loss=1.7879 acc=0.4275
+{'eval': {'eval_loss': 2.6059632301330566, 'eval_log_loss': 1.787921130449689, 'eval_accuracy': 0.4274911779532852, 'eval_runtime': 814.0867, 'eval_samples_per_second': 7.31, 'eval_steps_per_second': 0.914, 'epoch': 1.1953696788648245}}
+[Step5] Done fold 0 -> model_save/distilled_gemma2-9b_fold_0

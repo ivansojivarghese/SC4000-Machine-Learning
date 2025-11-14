@@ -1,0 +1,20 @@
+[Step5] Distilling fold 1 using LLaMA-only OOF probs
+[Step5] Using teacher OOF table: model_save/teacher_logits/oof_probs_fold1_merged.parquet (selector=auto)
+[Step5] Step-capped training: --max_steps=1000 will limit total steps (overrides epochs)
+[Step5] Eval strategy=steps steps | Save strategy=steps (save_steps=200) | logging_steps=100
+{'loss': 4.4517, 'grad_norm': 38.212642669677734, 'learning_rate': 4.792553191489362e-05, 'epoch': 0.06}
+{'loss': 3.8817, 'grad_norm': 7.829260349273682, 'learning_rate': 4.2606382978723406e-05, 'epoch': 0.12}
+{'loss': 3.6127, 'grad_norm': 24.843368530273438, 'learning_rate': 3.728723404255319e-05, 'epoch': 0.18}
+{'loss': 3.4243, 'grad_norm': 14.702865600585938, 'learning_rate': 3.1968085106382976e-05, 'epoch': 0.24}
+{'loss': 3.7207, 'grad_norm': 25.223857879638672, 'learning_rate': 2.664893617021277e-05, 'epoch': 0.3}
+{'loss': 3.5012, 'grad_norm': 7.10441780090332, 'learning_rate': 2.1329787234042554e-05, 'epoch': 0.36}
+{'loss': 3.4918, 'grad_norm': 22.30750274658203, 'learning_rate': 1.6010638297872342e-05, 'epoch': 0.42}
+{'loss': 3.4224, 'grad_norm': 10.803618431091309, 'learning_rate': 1.0691489361702128e-05, 'epoch': 0.48}
+{'loss': 3.4785, 'grad_norm': 11.550374031066895, 'learning_rate': 5.372340425531915e-06, 'epoch': 0.54}
+{'loss': 3.202, 'grad_norm': 7.131021499633789, 'learning_rate': 5.319148936170213e-08, 'epoch': 0.6}
+{'train_runtime': 14921.1435, 'train_samples_per_second': 2.145, 'train_steps_per_second': 0.067, 'train_loss': 3.6187007141113283, 'epoch': 0.6}
+[Distill][Eval] step=1000 epoch=0.60 eval_loss=0.8402 eval_log_loss=1.1235 acc=0.4524
+{'eval': {'eval_loss': 0.8402197957038879, 'eval_log_loss': 1.123497400860418, 'eval_accuracy': 0.4523609477398757, 'eval_runtime': 815.6483, 'eval_samples_per_second': 7.296, 'eval_steps_per_second': 0.912, 'epoch': 0.5974607916355489}}
+[Step5] Exporting classifier head to model_save/distilled_gemma2-9b_fold_1/classifier_head.pt
+{'saved': 'model_save/distilled_gemma2-9b_fold_1/classifier_head.pt'}
+[Step5] Done fold 1 -> model_save/distilled_gemma2-9b_fold_1
