@@ -51,7 +51,7 @@ BASED LARGE LANGUAGE MODEL ALIGNMENT](https://openreview.net/pdf/c86736447d5c66d
 
 ===
 
-HF_token: REDACTED
+HF_token: REDACTED (obtain a fine-grained token from Hugging Face)
 
 ## SLURM Start-up Commands:
 
