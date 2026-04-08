@@ -1,3 +1,7 @@
+# Final Report
+
+View on ResearchGate: [Report.pdf](https://doi.org/10.13140/RG.2.2.34192.78084)
+
 # Solution:
 
 === Referencing Winning Solution: [BlackPearl No-Leak 1st Place Solution – LMSYS Chatbot Arena (Kaggle Competition Write-up)](https://www.kaggle.com/competitions/lmsys-chatbot-arena/writeups/blackpearl-no-leak-1st-place-solution-distill-is-a) ===
